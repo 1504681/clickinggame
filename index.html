@@ -39,8 +39,8 @@
   #stats {
     display: flex;
     justify-content: space-between;
-    width: 100%;
-    max-width: 340px;
+    width: 92vmin;
+    max-width: 440px;
     margin-bottom: 10px;
     font-size: 1.1rem;
   }
@@ -54,9 +54,11 @@
   #grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    width: 340px;
-    height: 340px;
+    gap: 3px;
+    width: 92vmin;
+    max-width: 440px;
+    height: 92vmin;
+    max-height: 440px;
     touch-action: manipulation;
   }
 
@@ -235,10 +237,21 @@ for (let i = 0; i < GRID_SIZE; i++) {
   const tile = document.createElement('div');
   tile.classList.add('tile', 'white');
   tile.dataset.index = i;
-  tile.addEventListener('pointerdown', (e) => { e.preventDefault(); handleTap(i); });
   grid.appendChild(tile);
   tiles.push(tile);
 }
+
+// Event delegation on grid — find tile by coordinates so corner/edge clicks always register
+grid.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const rect = grid.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const col = Math.floor((x / rect.width) * 4);
+  const row = Math.floor((y / rect.height) * 4);
+  if (col < 0 || col > 3 || row < 0 || row > 3) return;
+  handleTap(row * 4 + col);
+});
 
 // Menu buttons
 document.getElementById('btn-classic').onclick = () => startGame('classic');
