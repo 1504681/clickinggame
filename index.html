@@ -300,10 +300,10 @@ function startGame(m) {
   renderTiles();
 }
 
-function placeBlackTiles(count) {
+function placeBlackTiles(count, exclude = -1) {
   const whiteTiles = [];
   for (let i = 0; i < GRID_SIZE; i++) {
-    if (!blackTiles.has(i)) whiteTiles.push(i);
+    if (!blackTiles.has(i) && i !== exclude) whiteTiles.push(i);
   }
   for (let j = 0; j < count && whiteTiles.length > 0; j++) {
     const idx = Math.floor(Math.random() * whiteTiles.length);
@@ -328,7 +328,7 @@ function handleTap(index) {
     blackTiles.delete(index);
     tiles[index].classList.add('flash-green');
     setTimeout(() => tiles[index].classList.remove('flash-green'), 80);
-    placeBlackTiles(1);
+    placeBlackTiles(1, index);
     renderTiles();
 
     if (mode === 'classic' && score >= CLASSIC_TARGET) {
