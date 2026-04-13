@@ -9,7 +9,7 @@
 
   body {
     font-family: 'Segoe UI', Arial, sans-serif;
-    background: #1a1a2e;
+    background: #000;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -64,16 +64,18 @@
     border-radius: 6px;
     cursor: pointer;
     transition: background 0.08s, transform 0.08s;
-    border: 1px solid rgba(255,255,255,0.08);
+    background: #000;
+    border: 1px solid rgba(255,255,255,0.12);
   }
 
   .tile.white {
-    background: #e8e8e8;
+    background: #000;
+    border-color: rgba(255,255,255,0.12);
   }
 
   .tile.black {
-    background: #16213e;
-    border: 1px solid rgba(255,255,255,0.15);
+    background: #111;
+    border-color: rgba(255,255,255,0.5);
   }
 
   .tile.black:active {
