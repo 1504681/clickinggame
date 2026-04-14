@@ -436,6 +436,32 @@
     text-transform: uppercase;
   }
 
+  /* Aim category dots */
+  .cat-dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  .cat-dot.tracking      { background: #06b6d4; box-shadow: 0 0 8px rgba(6,182,212,0.7); }
+  .cat-dot.click-timing  { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.7); }
+  .cat-dot.target-switch { background: #a855f7; box-shadow: 0 0 8px rgba(168,85,247,0.7); }
+  .cat-dot.none          { background: rgba(255,255,255,0.25); }
+
+  .cat-legend {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 10px;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .cat-legend span { display: flex; align-items: center; }
+
   /* Scenario buttons get accent-colored left border */
   .btn.primary { border-left: 3px solid var(--accent); }
   .btn.primary:hover { border-color: var(--accent); box-shadow: 0 0 18px rgba(6,182,212,0.18); }
@@ -826,6 +852,22 @@
     font-weight: 800;
     font-variant-numeric: tabular-nums;
   }
+  .gameover-stats .stat .val.in-band  { color: var(--success); }
+  .gameover-stats .stat .val.too-low  { color: var(--danger); }
+  .gameover-stats .stat .val.too-high { color: var(--warning); }
+
+  .acc-tip {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    margin-top: -8px;
+    margin-bottom: 14px;
+    opacity: 0.9;
+  }
+  .acc-tip.in-band  { color: var(--success); }
+  .acc-tip.too-low  { color: var(--danger); }
+  .acc-tip.too-high { color: var(--warning); }
 
   #best-score, #over-time {
     font-size: 0.85rem;
@@ -964,20 +1006,26 @@
 
   <div class="section-label">Click Timing</div>
   <div class="menu-grid">
-    <button class="btn primary" id="btn-classic">Classic<span class="desc">Hit 50 targets · fastest time wins</span></button>
-    <button class="btn warn" id="btn-endurance">Endurance<span class="desc">Survive 60s · don't miss</span></button>
-    <button class="btn muted" id="btn-zen">Zen<span class="desc">No timer · just shoot</span></button>
-    <button class="btn success" id="btn-flicks">Flicks<span class="desc">One target at random spots</span></button>
+    <button class="btn primary" id="btn-classic"><span class="cat-dot click-timing"></span>Classic<span class="desc">Hit 50 targets · fastest time wins</span></button>
+    <button class="btn warn" id="btn-endurance"><span class="cat-dot click-timing"></span>Endurance<span class="desc">Survive 60s · don't miss</span></button>
+    <button class="btn muted" id="btn-zen"><span class="cat-dot none"></span>Zen<span class="desc">No timer · just shoot</span></button>
+    <button class="btn success" id="btn-flicks"><span class="cat-dot click-timing"></span>Flicks<span class="desc">One target at random spots</span></button>
   </div>
 
   <div class="section-label">Tracking & Movement</div>
   <div class="menu-grid">
-    <button class="btn success" id="btn-tracking">Tracking<span class="desc">Bouncing targets · headshots ×2</span></button>
-    <button class="btn success" id="btn-cylinder">Pursuer<span class="desc">One bot kites you · health bar</span></button>
-    <button class="btn danger" id="btn-dodge">Dodge<span class="desc">WASD · strafe with the bar for ×2</span></button>
+    <button class="btn success" id="btn-tracking"><span class="cat-dot tracking"></span>Tracking<span class="desc">Bouncing targets · headshots ×2</span></button>
+    <button class="btn success" id="btn-cylinder"><span class="cat-dot tracking"></span>Pursuer<span class="desc">One bot kites you · health bar</span></button>
+    <button class="btn danger" id="btn-dodge"><span class="cat-dot target-switch"></span>Dodge<span class="desc">WASD · strafe with the bar for ×2</span></button>
   </div>
 
-  <div class="row" style="margin-top:18px;">
+  <div class="cat-legend">
+    <span><span class="cat-dot tracking"></span>Tracking</span>
+    <span><span class="cat-dot click-timing"></span>Click Timing</span>
+    <span><span class="cat-dot target-switch"></span>Target Switching</span>
+  </div>
+
+  <div class="row" style="margin-top:14px;">
     <button class="btn muted" id="btn-settings">⚙ Settings</button>
   </div>
 </div>
@@ -1133,11 +1181,13 @@
     <div id="pb-pill" class="pb-pill" style="display:none;">★ NEW BEST</div>
     <div class="pb-delta" id="pb-delta" style="display:none;"></div>
     <div class="pb-line" id="pb-line"></div>
-    <div class="gameover-stats">
+    <div class="gameover-stats" style="grid-template-columns: repeat(4, 1fr);">
       <div class="stat"><span class="lbl">Accuracy</span><span class="val" id="go-acc">0%</span></div>
       <div class="stat"><span class="lbl">Hits</span><span class="val" id="go-hits">0/0</span></div>
       <div class="stat"><span class="lbl">Best Streak</span><span class="val" id="go-streak">0</span></div>
+      <div class="stat"><span class="lbl">Reactivity</span><span class="val" id="go-react">—</span></div>
     </div>
+    <div class="acc-tip" id="acc-tip"></div>
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-label"><span>Score · Last Runs</span><span class="latest" id="chart-score-latest"></span></div>
@@ -1430,6 +1480,11 @@ let pursuerDir = 'left';
 let pursuerFill = 0;       // 0..1
 let pursuerMul = 1;
 let pursuerCurrentDur = 2.5;
+
+// Reactivity tracking — measures ms between bar flip and player input matching new direction
+let pursuerReactStart = 0;
+let pursuerReactWaiting = false;
+let pursuerReactSamples = [];
 
 // Camera rotation
 let yaw = 0;
@@ -2276,6 +2331,17 @@ function spawnDmgPopup(worldX, worldY, worldZ, text, kind) {
   setTimeout(() => div.remove(), 750);
 }
 
+function rollingAverage(values, window = 5) {
+  const out = [];
+  for (let i = 0; i < values.length; i++) {
+    const start = Math.max(0, i - window + 1);
+    let sum = 0, count = 0;
+    for (let j = start; j <= i; j++) { sum += values[j]; count++; }
+    out.push(sum / count);
+  }
+  return out;
+}
+
 function drawLineChart(canvas, values, color, opts = {}) {
   const ctx = canvas.getContext('2d');
   // High-DPI scale
@@ -2369,6 +2435,22 @@ function drawLineChart(canvas, values, color, opts = {}) {
       ctx.arc(x, y, 5, 0, Math.PI * 2);
       ctx.stroke();
     }
+  }
+
+  // Optional overlay line (e.g. rolling average), drawn dashed in a separate color
+  if (opts.overlay && opts.overlay.length === values.length) {
+    ctx.beginPath();
+    for (let i = 0; i < opts.overlay.length; i++) {
+      const x = padX + (opts.overlay.length === 1 ? usableW / 2 : i * xStep);
+      const y = padTop + usableH - ((opts.overlay[i] - min) / range) * usableH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = opts.overlayColor || '#fbbf24cc';
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 }
 
@@ -2572,6 +2654,9 @@ function animate(now) {
       pursuerFill = 0;
       pursuerDir = (pursuerDir === 'left') ? 'right' : 'left';
       pursuerCurrentDur = pickPursuerDuration();
+      // Begin a reactivity sample
+      pursuerReactStart = now;
+      pursuerReactWaiting = true;
       playFlipBeep();
     }
     dirBarFill.style.width = (pursuerFill * 100) + '%';
@@ -2582,6 +2667,14 @@ function animate(now) {
     pursuerMul = correct ? 2 : (left || right ? 1 : 0.5);
     dirBar.classList.toggle('correct', correct);
     dirBar.classList.toggle('wrong', !correct && (left || right));
+
+    // Record reactivity once player matches the new direction
+    if (pursuerReactWaiting && correct) {
+      const elapsed = now - pursuerReactStart;
+      // Cap to avoid recording absurd values when player simply doesn't react
+      if (elapsed < 3000) pursuerReactSamples.push(elapsed);
+      pursuerReactWaiting = false;
+    }
   }
 
   // Dodge bar update
@@ -2736,6 +2829,8 @@ function startGame(m) {
     pursuerFill = 0;
     pursuerMul = 1;
     pursuerCurrentDur = pickPursuerDuration();
+    pursuerReactSamples = [];
+    pursuerReactWaiting = false;
     dirBar.classList.add('show');
     dirBar.classList.remove('correct', 'wrong');
     const e = makeCylinder();
@@ -2761,7 +2856,12 @@ function pauseGame() {
   $('pause-time').textContent = mode === 'classic' ? elapsedSeconds().toFixed(2) : (timerDuration > 0 ? timeLeft.toFixed(1) + 's' : elapsedSeconds().toFixed(1));
   const acc = shotsFired === 0 ? 0 : Math.round((shotsHit / shotsFired) * 100);
   $('pause-acc').textContent = acc + '%';
-  $('pause-hits').textContent = shotsHit + '/' + shotsFired;
+  if (mode === 'cylinder' && pursuerReactSamples.length > 0) {
+    const avgReact = Math.round(pursuerReactSamples.reduce((a,b)=>a+b,0) / pursuerReactSamples.length);
+    $('pause-hits').textContent = avgReact + 'ms react';
+  } else {
+    $('pause-hits').textContent = shotsHit + '/' + shotsFired;
+  }
   showOnly(pauseScreen);
 }
 
@@ -2836,9 +2936,33 @@ function gameOver(won) {
   overTitle.className = titleClass;
   $('result-headline').textContent = headline;
   $('result-sub').textContent = headSub;
-  $('go-acc').textContent = acc + '%';
+  // Accuracy band coloring (85-95% gold band)
+  const accEl = $('go-acc');
+  accEl.textContent = acc + '%';
+  accEl.classList.remove('in-band', 'too-low', 'too-high');
+  const accTipEl = $('acc-tip');
+  accTipEl.classList.remove('in-band', 'too-low', 'too-high');
+  if (shotsFired === 0) {
+    accTipEl.textContent = '';
+  } else if (acc >= 85 && acc <= 95) {
+    accEl.classList.add('in-band');
+    accTipEl.classList.add('in-band');
+    accTipEl.textContent = '✓ Ideal range — push for more speed';
+  } else if (acc < 85) {
+    accEl.classList.add('too-low');
+    accTipEl.classList.add('too-low');
+    accTipEl.textContent = '↓ Below 85% — slow down or drop difficulty';
+  } else {
+    accEl.classList.add('too-high');
+    accTipEl.classList.add('too-high');
+    accTipEl.textContent = '↑ Above 95% — increase difficulty';
+  }
+
   $('go-hits').textContent = `${shotsHit}/${shotsFired}`;
   $('go-streak').textContent = bestStreak;
+  $('go-react').textContent = (mode === 'cylinder' && pursuerReactSamples.length > 0)
+    ? Math.round(pursuerReactSamples.reduce((a,b)=>a+b,0) / pursuerReactSamples.length) + 'ms'
+    : '—';
 
   // PB detection + history
   let isPb = false;
@@ -2910,10 +3034,10 @@ function gameOver(won) {
   if (history.length > 0) {
     const scoreVals = history.map(r => r.score);
     const accVals = history.map(r => r.acc);
-    // For lower-is-better (time), invert color meaning but still show line — use accent color always
-    const scoreColor = lower ? '#06b6d4' : '#06b6d4';
-    drawLineChart(scoreCanvas, scoreVals, scoreColor);
-    drawLineChart(accCanvas, accVals, '#10b981', { fixedMin: 0, fixedMax: 100 });
+    const scoreAvg = rollingAverage(scoreVals, 5);
+    const accAvg = rollingAverage(accVals, 5);
+    drawLineChart(scoreCanvas, scoreVals, '#06b6d4', { overlay: scoreAvg });
+    drawLineChart(accCanvas,  accVals,  '#10b981', { fixedMin: 0, fixedMax: 100, overlay: accAvg });
     const lastScore = scoreVals[scoreVals.length - 1];
     $('chart-score-latest').textContent = lower ? lastScore.toFixed(2) + 's' : lastScore;
     $('chart-acc-latest').textContent = (accVals[accVals.length - 1] || 0) + '%';
