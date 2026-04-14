@@ -170,6 +170,26 @@
     font-weight: 400;
   }
 
+  /* Calibration overlay */
+  #cal-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0,0,0,0.95);
+    z-index: 30;
+    text-align: center;
+    padding: 20px;
+  }
+  #cal-overlay.show { display: flex; }
+  #cal-overlay h2 { font-size: 1.8rem; }
+  #cal-overlay p { font-size: 1.1rem; opacity: 0.9; max-width: 480px; }
+  #cal-overlay .big { font-size: 2.4rem; opacity: 1; font-weight: 700; color: #2ecc71; }
+  #cal-overlay small { opacity: 0.6; font-size: 0.85rem; }
+
   /* Click-to-lock prompt */
   #lock-prompt {
     position: fixed;
@@ -247,9 +267,10 @@
   <h1>Don't Tap the White Tile<span class="badge">FPS</span></h1>
   <div class="sens">1000 DPI · OW sens 3.54 · reference 15.4083 in / 360°</div>
   <div class="cal">
-    <label>in / 360°: <input id="cal-input" type="number" step="0.1" value="15.4083"></label>
+    <label>in / 360°: <input id="cal-input" type="number" step="0.01" value="15.4083"></label>
     <button id="cal-reset" type="button">reset</button>
-    <div class="cal-hint">Browser pointer lock loses raw counts — tweak this to match an in-game 360.</div>
+    <button id="cal-start" type="button">calibrate</button>
+    <div class="cal-hint">Browser pointer lock loses raw counts to OS pointer settings — calibrate or tweak the value above.</div>
   </div>
   <button id="btn-classic">Classic<br><span class="mode-desc">Shoot 50 black tiles as fast as you can</span></button>
   <button id="btn-endurance">Endurance<br><span class="mode-desc">Survive 60 seconds — don't shoot the wrong tile</span></button>
@@ -259,6 +280,14 @@
 <div id="lock-prompt">
   <div>Click to aim</div>
   <small>ESC to release · Left click to shoot</small>
+</div>
+
+<div id="cal-overlay">
+  <h2>Calibration</h2>
+  <p>Swipe one full <b>360°</b> as you would in your reference game, then press <b>SPACE</b>.</p>
+  <p class="big" id="cal-live">0 movement units</p>
+  <p>Suggested in / 360°: <b id="cal-suggest">—</b></p>
+  <small>ESC to cancel</small>
 </div>
 
 <div id="overlay">
@@ -436,12 +465,18 @@ document.addEventListener('pointerlockchange', () => {
   }
 });
 
+let calibrating = false;
+let calYawTotal = 0;
+
 document.addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
-  // movementX is CSS pixels; multiply by devicePixelRatio to approximate raw mouse counts
-  const dpr = window.devicePixelRatio || 1;
-  yaw   -= e.movementX * dpr * radPerCount;
-  pitch -= e.movementY * dpr * radPerCount;
+  if (calibrating) {
+    calYawTotal += Math.abs(e.movementX);
+    calLiveDisplay();
+    return;
+  }
+  yaw   -= e.movementX * radPerCount;
+  pitch -= e.movementY * radPerCount;
   if (pitch >  PITCH_LIMIT) pitch =  PITCH_LIMIT;
   if (pitch < -PITCH_LIMIT) pitch = -PITCH_LIMIT;
 });
@@ -527,6 +562,48 @@ document.getElementById('cal-reset').onclick = () => {
   setInches(DEFAULT_INCHES_PER_360);
   calInput.value = DEFAULT_INCHES_PER_360;
 };
+
+// === Calibration mode ===
+const calOverlay = document.getElementById('cal-overlay');
+const calLive = document.getElementById('cal-live');
+const calSuggest = document.getElementById('cal-suggest');
+
+function calLiveDisplay() {
+  calLive.textContent = Math.round(calYawTotal) + ' movement units';
+  // Suggested in/360 = movement_units / DPI (assumes their swipe was actually one full 360 in their reference game)
+  if (calYawTotal > 0) {
+    calSuggest.textContent = (calYawTotal / DPI).toFixed(4) + ' in / 360°';
+  }
+}
+
+document.getElementById('cal-start').onclick = () => {
+  calibrating = true;
+  calYawTotal = 0;
+  calLiveDisplay();
+  calOverlay.classList.add('show');
+  requestLock();
+};
+
+function finishCalibration(save) {
+  calibrating = false;
+  calOverlay.classList.remove('show');
+  if (document.exitPointerLock) document.exitPointerLock();
+  if (save && calYawTotal > 0) {
+    const newIn360 = calYawTotal / DPI;
+    setInches(newIn360);
+    calInput.value = newIn360.toFixed(4);
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!calibrating) return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    finishCalibration(true);
+  } else if (e.code === 'Escape') {
+    finishCalibration(false);
+  }
+});
 
 function showMenu() {
   overlay.classList.remove('show');
