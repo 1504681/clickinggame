@@ -1821,6 +1821,10 @@
         <input type="range" id="pc-hp" min="0.25" max="5" step="0.25">
         <span class="value" id="pc-hp-v">×1.00</span>
       </div>
+      <div class="field"><label>Target distance</label>
+        <input type="range" id="pc-dist" min="0.4" max="2.5" step="0.1">
+        <span class="value" id="pc-dist-v">×1.00</span>
+      </div>
       <div class="row" style="margin-top:10px; justify-content:flex-start;">
         <button class="btn muted" id="pc-reset">Reset</button>
       </div>
@@ -2036,6 +2040,10 @@
           <input type="range" id="sd-cust-hp" min="0.25" max="5" step="0.25">
           <span class="value" id="sd-cust-hp-v">×1.00</span>
         </div>
+        <div class="field"><label>Target distance</label>
+          <input type="range" id="sd-cust-dist" min="0.4" max="2.5" step="0.1">
+          <span class="value" id="sd-cust-dist-v">×1.00</span>
+        </div>
         <div class="field"><label>Use custom settings</label>
           <input type="checkbox" id="sd-cust-enable">
         </div>
@@ -2159,10 +2167,10 @@ const DEFAULT_SETTINGS = {
   submitScores: true,
   // Per-scenario custom multipliers (size, speed, dirChange, hp) + enabled flag
   customScenarios: {
-    bouncing: { size: 1, speed: 1, dir: 1, hp: 1, enabled: false },
-    cylinder: { size: 1, speed: 1, dir: 1, hp: 1, enabled: false },
-    dodge:    { size: 1, speed: 1, dir: 1, hp: 1, enabled: false },
-    pole:     { size: 1, speed: 1, dir: 1, hp: 1, enabled: false }
+    bouncing: { size: 1, speed: 1, dir: 1, hp: 1, distance: 1, enabled: false },
+    cylinder: { size: 1, speed: 1, dir: 1, hp: 1, distance: 1, enabled: false },
+    dodge:    { size: 1, speed: 1, dir: 1, hp: 1, distance: 1, enabled: false },
+    pole:     { size: 1, speed: 1, dir: 1, hp: 1, distance: 1, enabled: false }
   }
 };
 
@@ -2716,14 +2724,17 @@ const ENEMY_HEAD_SIZE = 0.22;
 const ENEMY_Z = PANEL_Z + 0.45;
 
 // Bouncing Targets arena
-const BOUNCE_X = 5.5;
+const BOUNCE_X = 9;
 const BOUNCE_Y_BOT = 0.6;
-const BOUNCE_Y_TOP = 5.4;
+const BOUNCE_Y_TOP = 6.8;
 const BOUNCE_Z_NEAR = -2.5;
-const BOUNCE_Z_FAR = -12;
+const BOUNCE_Z_FAR = -16;
 const BOUNCE_TARGET_RADIUS = 0.22;
 const BOUNCE_MAX_SPEED = 7.5;
 const BOUNCE_TARGET_COUNT = 5;
+// Mutable Z bounds used at runtime (distance slider shifts the arena back/forward)
+let currentBounceZNear = BOUNCE_Z_NEAR;
+let currentBounceZFar  = BOUNCE_Z_FAR;
 
 const bounceRoom = new THREE.Mesh(
   new THREE.BoxGeometry(BOUNCE_X * 2, BOUNCE_Y_TOP - BOUNCE_Y_BOT, BOUNCE_Z_NEAR - BOUNCE_Z_FAR),
@@ -2822,7 +2833,7 @@ function placeBouncingTarget(e) {
   e.group.position.set(
     -BOUNCE_X + r + Math.random() * (BOUNCE_X * 2 - 2 * r),
     BOUNCE_Y_BOT + r + Math.random() * (BOUNCE_Y_TOP - BOUNCE_Y_BOT - 2 * r),
-    BOUNCE_Z_FAR + r + Math.random() * (BOUNCE_Z_NEAR - BOUNCE_Z_FAR - 2 * r)
+    currentBounceZFar + r + Math.random() * (currentBounceZNear - currentBounceZFar - 2 * r)
   );
   // Random 3D velocity, capped
   const speed = (3.5 + Math.random() * 2.5) * Math.sqrt(currentDifficulty().speedMul);
@@ -2854,8 +2865,8 @@ function updateBouncingTargets(dt) {
     if (e.group.position.x + r >  BOUNCE_X) { e.group.position.x =  BOUNCE_X - r; e.vx = -Math.abs(e.vx); }
     if (e.group.position.y - r < BOUNCE_Y_BOT) { e.group.position.y = BOUNCE_Y_BOT + r; e.vy =  Math.abs(e.vy); }
     if (e.group.position.y + r > BOUNCE_Y_TOP) { e.group.position.y = BOUNCE_Y_TOP - r; e.vy = -Math.abs(e.vy); }
-    if (e.group.position.z - r < BOUNCE_Z_FAR) { e.group.position.z = BOUNCE_Z_FAR + r; e.vz =  Math.abs(e.vz); }
-    if (e.group.position.z + r > BOUNCE_Z_NEAR) { e.group.position.z = BOUNCE_Z_NEAR - r; e.vz = -Math.abs(e.vz); }
+    if (e.group.position.z - r < currentBounceZFar) { e.group.position.z = currentBounceZFar + r; e.vz =  Math.abs(e.vz); }
+    if (e.group.position.z + r > currentBounceZNear) { e.group.position.z = currentBounceZNear - r; e.vz = -Math.abs(e.vz); }
   }
   // Sphere-sphere collisions (equal-mass elastic)
   for (let i = 0; i < enemies.length; i++) {
@@ -3103,9 +3114,11 @@ function makePole() {
 }
 
 function placeCylinder(e) {
-  // Spawn at random angle around player at far edge
+  // Spawn at random angle around player at far edge (scaled by distance mul)
+  const diff = currentDifficulty();
+  const distMul = diff.distanceMul || 1;
   const angle = Math.random() * Math.PI * 2;
-  const r = 9 + Math.random() * 3;
+  const r = (9 + Math.random() * 3) * distMul;
   e.group.position.set(
     camera.position.x + Math.sin(angle) * r,
     CYL_BODY_HEIGHT / 2,
@@ -3127,7 +3140,7 @@ function updateCylinders(dt) {
   if (mode !== 'cylinder') return;
   const diff = currentDifficulty();
   const baseSpeed = 4.5 * diff.speedMul;
-  const targetDist = 7;
+  const targetDist = 7 * (diff.distanceMul || 1);
   const lim = ROOM_HALF - 1;
   for (const e of enemies) {
     if (!e.cylinder) continue;
@@ -3190,11 +3203,12 @@ function currentDifficulty() {
       headScale:   base.headScale,
       dirChangeMs: base.dirChangeMs / Math.max(0.1, activeCustomCfg.dir),
       targetScale: activeCustomCfg.size,
-      hpMul:       activeCustomCfg.hp || 1
+      hpMul:       activeCustomCfg.hp || 1,
+      distanceMul: activeCustomCfg.distance || 1
     };
   }
   const d = DIFFICULTY[Settings.difficulty] || DIFFICULTY.normal;
-  return { ...d, hpMul: 1 };
+  return { ...d, hpMul: 1, distanceMul: 1 };
 }
 
 let activeCustomMode = false;
@@ -4345,10 +4359,16 @@ function startGame(m, lockedWeapon = null) {
   } else if (mode === 'bouncing') {
     for (const t of tileMeshes) t.visible = false;
     backWall.visible = false;
+    // Apply distance multiplier — push the arena back by extra z units per (distMul-1)
+    const distMul = currentDifficulty().distanceMul || 1;
+    const zShift = (distMul - 1) * 7;  // up to +10.5 units back at 2.5x
+    currentBounceZNear = BOUNCE_Z_NEAR - zShift;
+    currentBounceZFar  = BOUNCE_Z_FAR - zShift;
+    bounceRoom.position.z = (currentBounceZNear + currentBounceZFar) / 2;
     bounceRoom.visible = true;
-    // Aim camera at the center of the bounce room
+    // Aim camera at the center of the (shifted) bounce room
     const targetY = (BOUNCE_Y_TOP + BOUNCE_Y_BOT) / 2;
-    const targetZ = (BOUNCE_Z_NEAR + BOUNCE_Z_FAR) / 2;
+    const targetZ = (currentBounceZNear + currentBounceZFar) / 2;
     pitch = Math.atan((targetY - camera.position.y) / -targetZ);
     for (let i = 0; i < BOUNCE_TARGET_COUNT; i++) {
       const e = makeBouncingTarget();
@@ -4448,7 +4468,7 @@ function pauseGame() {
   refreshPausePreview();
 
   // Update stats display
-  $('pause-score').textContent = score;
+  $('pause-score').textContent = Math.round(score);
   $('pause-time').textContent = mode === 'classic' ? elapsedSeconds().toFixed(2) : (timerDuration > 0 ? timeLeft.toFixed(1) + 's' : elapsedSeconds().toFixed(1));
   const acc = shotsFired === 0 ? 0 : Math.round((shotsHit / shotsFired) * 100);
   $('pause-acc').textContent = acc + '%';
@@ -4506,6 +4526,8 @@ function syncCustomizeSliders() {
   $('pc-dir-v').textContent = '×' + Number(cfg.dir).toFixed(2);
   $('pc-hp').value = cfg.hp || 1;
   $('pc-hp-v').textContent = '×' + Number(cfg.hp || 1).toFixed(2);
+  $('pc-dist').value = cfg.distance || 1;
+  $('pc-dist-v').textContent = '×' + Number(cfg.distance || 1).toFixed(2);
 }
 
 // Pause menu difficulty buttons — preview only, don't restart
@@ -4531,10 +4553,11 @@ function handleResumeClick() {
     cfg.speed = parseFloat($('pc-speed').value);
     cfg.dir = parseFloat($('pc-dir').value);
     cfg.hp = parseFloat($('pc-hp').value);
+    cfg.distance = parseFloat($('pc-dist').value);
     cfg.enabled = true;
     saveSettings();
     activeCustomMode = true;
-    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir, hp: cfg.hp };
+    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir, hp: cfg.hp, distance: cfg.distance };
   } else {
     Settings.difficulty = pausePreviewDiff;
     saveSettings();
@@ -4564,6 +4587,7 @@ bindPauseSlider('pc-size', 'pc-size-v', 'size');
 bindPauseSlider('pc-speed', 'pc-speed-v', 'speed');
 bindPauseSlider('pc-dir', 'pc-dir-v', 'dir');
 bindPauseSlider('pc-hp', 'pc-hp-v', 'hp');
+bindPauseSlider('pc-dist', 'pc-dist-v', 'distance');
 
 // Preset-load buttons inside the customize section — fill sliders with that preset's values
 for (const pb of document.querySelectorAll('.preset-btn')) {
@@ -4583,7 +4607,7 @@ for (const pb of document.querySelectorAll('.preset-btn')) {
 
 $('pc-reset').onclick = () => {
   if (!mode) return;
-  Settings.customScenarios[mode] = { size: 1, speed: 1, dir: 1, hp: 1, enabled: false };
+  Settings.customScenarios[mode] = { size: 1, speed: 1, dir: 1, hp: 1, distance: 1, enabled: false };
   saveSettings();
   syncCustomizeSliders();
 };
@@ -5074,7 +5098,7 @@ async function openScenarioDetail(modeKey) {
   $('sd-play-track').classList.toggle('selected', Settings.weapon === 'tracking' || isPoleOnly);
 
   // Sync customize UI from saved per-scenario settings
-  const cfg = Settings.customScenarios[modeKey] || { size: 1, speed: 1, dir: 1, hp: 1, enabled: false };
+  const cfg = Settings.customScenarios[modeKey] || { size: 1, speed: 1, dir: 1, hp: 1, distance: 1, enabled: false };
   $('sd-cust-size').value = cfg.size;
   $('sd-cust-size-v').textContent = '×' + Number(cfg.size).toFixed(2);
   $('sd-cust-speed').value = cfg.speed;
@@ -5083,6 +5107,8 @@ async function openScenarioDetail(modeKey) {
   $('sd-cust-dir-v').textContent = '×' + Number(cfg.dir).toFixed(2);
   $('sd-cust-hp').value = cfg.hp || 1;
   $('sd-cust-hp-v').textContent = '×' + Number(cfg.hp || 1).toFixed(2);
+  $('sd-cust-dist').value = cfg.distance || 1;
+  $('sd-cust-dist-v').textContent = '×' + Number(cfg.distance || 1).toFixed(2);
   $('sd-cust-enable').checked = !!cfg.enabled;
   if (cfg.enabled) $('sd-customize').setAttribute('open', '');
 
@@ -5112,7 +5138,7 @@ function startFromDetail(weapon) {
   const cfg = Settings.customScenarios[sdMode];
   if (cfg && cfg.enabled) {
     activeCustomMode = true;
-    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir, hp: cfg.hp || 1 };
+    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir, hp: cfg.hp || 1, distance: cfg.distance || 1 };
   } else {
     activeCustomMode = false;
     activeCustomCfg = null;
@@ -5139,6 +5165,7 @@ bindCustomSlider('sd-cust-size', 'sd-cust-size-v', 'size');
 bindCustomSlider('sd-cust-speed', 'sd-cust-speed-v', 'speed');
 bindCustomSlider('sd-cust-dir', 'sd-cust-dir-v', 'dir');
 bindCustomSlider('sd-cust-hp', 'sd-cust-hp-v', 'hp');
+bindCustomSlider('sd-cust-dist', 'sd-cust-dist-v', 'distance');
 
 $('sd-cust-enable').addEventListener('change', () => {
   if (sdMode) {
@@ -5149,7 +5176,7 @@ $('sd-cust-enable').addEventListener('change', () => {
 
 $('sd-cust-reset').onclick = () => {
   if (!sdMode) return;
-  Settings.customScenarios[sdMode] = { size: 1, speed: 1, dir: 1, hp: 1, enabled: false };
+  Settings.customScenarios[sdMode] = { size: 1, speed: 1, dir: 1, hp: 1, distance: 1, enabled: false };
   saveSettings();
   openScenarioDetail(sdMode); // re-render
 };
