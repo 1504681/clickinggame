@@ -2701,18 +2701,23 @@ let calYawTotal = 0;
 
 document.addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
+  // Drop the first few events after pointer lock — they may contain a buffered jolt
+  if (skipNextMouseEvents > 0) { skipNextMouseEvents--; return; }
+  // Clamp pathological per-event deltas — anything > 250 in one event is almost always a glitch
+  let mx = e.movementX, my = e.movementY;
+  if (Math.abs(mx) > 250 || Math.abs(my) > 250) return;
   if (calibrating) {
-    calYawTotal += Math.abs(e.movementX);
+    calYawTotal += Math.abs(mx);
     calLiveDisplay();
     return;
   }
-  yaw   -= e.movementX * radPerCount;
-  pitch -= e.movementY * radPerCount;
+  yaw   -= mx * radPerCount;
+  pitch -= my * radPerCount;
   if (pitch >  PITCH_LIMIT) pitch =  PITCH_LIMIT;
   if (pitch < -PITCH_LIMIT) pitch = -PITCH_LIMIT;
 
   // Smooth movementX for reactivity tracking
-  mouseXSmooth = mouseXSmooth * (1 - MOUSE_SMOOTH_ALPHA) + e.movementX * MOUSE_SMOOTH_ALPHA;
+  mouseXSmooth = mouseXSmooth * (1 - MOUSE_SMOOTH_ALPHA) + mx * MOUSE_SMOOTH_ALPHA;
 
   if (pursuerReactPhase > 0 && gameActive && mode === 'cylinder') {
     if (pursuerReactPhase === 1) {
