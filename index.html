@@ -241,12 +241,11 @@
     background: #e94560;
   }
 
-  /* Pursuer direction bar (middle-left of screen) */
+  /* Pursuer direction bar (lower-left of screen, near crosshair) */
   #dir-bar {
     position: fixed;
-    top: 50%;
-    left: var(--hud-inset);
-    transform: translateY(-50%);
+    bottom: calc(var(--hud-inset) + 64px);
+    left: calc(var(--hud-inset) + 16px);
     background: rgba(10,11,16,0.72);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -308,8 +307,9 @@
 
   /* Dodge bar (player-driven fill, switch at green zone for max points) */
   #dodge-bar {
-    position: fixed; top: 50%; right: var(--hud-inset);
-    transform: translateY(-50%);
+    position: fixed;
+    bottom: calc(var(--hud-inset) + 64px);
+    left: calc(var(--hud-inset) + 16px);
     background: rgba(10,11,16,0.72);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -364,6 +364,8 @@
   #dodge-bar.overshoot { border-color: var(--danger); background: rgba(239,68,68,0.18); }
   #dodge-bar.overshoot .dodge-fill { background: var(--danger); }
   #dodge-bar.ready { border-color: var(--success); background: rgba(16,185,129,0.18); }
+  #dodge-bar.soon { border-color: var(--gold); background: rgba(251,191,36,0.16); }
+  #dodge-bar.soon .dodge-fill { background: linear-gradient(90deg, var(--accent), var(--gold)); }
 
   /* Menu screens */
   .screen {
@@ -837,6 +839,59 @@
     color: var(--text);
   }
 
+  /* Welcome form */
+  .fr-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 18px;
+    max-width: 480px;
+    width: 100%;
+  }
+  .fr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 14px;
+  }
+  .fr-field input, .fr-field select {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .fr-field input:focus, .fr-field select:focus { outline: 2px solid var(--accent); }
+  .fr-lbl {
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+  }
+  .fr-result {
+    grid-column: 1 / -1;
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    border-radius: var(--r);
+    padding: 12px 16px;
+    text-align: center;
+    box-shadow: 0 0 24px rgba(6,182,212,0.15);
+  }
+  .fr-result .fr-val {
+    display: block;
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--accent);
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Calibration overlay */
   #cal-overlay {
     position: fixed; inset: 0;
@@ -1235,12 +1290,12 @@
   <div class="scenario-list">
     <div class="scenario-card">
       <div class="scenario-info">
-        <div class="scenario-name">Tracking</div>
-        <div class="scenario-desc">Bouncing sphere targets in a panel</div>
+        <div class="scenario-name">Bouncing Targets</div>
+        <div class="scenario-desc">Sphere targets bouncing in a 3D box · collide with each other and walls</div>
       </div>
       <div class="scenario-buttons">
-        <button class="play-btn click" data-mode="tracking" data-weapon="hitscan">Click</button>
-        <button class="play-btn track" data-mode="tracking" data-weapon="tracking">Track</button>
+        <button class="play-btn click" data-mode="bouncing" data-weapon="hitscan">Click</button>
+        <button class="play-btn track" data-mode="bouncing" data-weapon="tracking">Track</button>
       </div>
     </div>
     <div class="scenario-card">
@@ -1390,15 +1445,29 @@
 <!-- First-run sensitivity prompt -->
 <div id="first-run" class="screen">
   <h1>Welcome</h1>
-  <p style="max-width:480px;text-align:center;margin-bottom:14px;">
-    Enter your sensitivity from whatever game you want to match — measured in <b>inches per 360°</b>.<br>
-    A sensitivity converter (mouse-sensitivity.com etc.) can give you this value, or use the in-game calibration tool after setup.
+  <p style="max-width:520px;text-align:center;margin-bottom:18px;">
+    Pick the game whose sensitivity you want to match, enter your in-game value, and we'll convert it.
   </p>
-  <div class="row" style="margin-bottom:10px;">
-    <label>in / 360°: <input id="first-run-input" type="number" step="0.01" min="0.1" style="width:120px;padding:6px 8px;background:#111;border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:4px;font-size:1.1rem;"></label>
+  <div class="fr-grid">
+    <label class="fr-field">
+      <span class="fr-lbl">Mouse DPI</span>
+      <input id="fr-dpi" type="number" min="100" step="50" value="1000">
+    </label>
+    <label class="fr-field">
+      <span class="fr-lbl">Game</span>
+      <select id="fr-game"></select>
+    </label>
+    <label class="fr-field">
+      <span class="fr-lbl">In-game sens</span>
+      <input id="fr-sens" type="number" step="0.01" value="3.54">
+    </label>
+    <div class="fr-result">
+      <span class="fr-lbl">Computed</span>
+      <span class="fr-val" id="fr-converted">— in / 360°</span>
+    </div>
   </div>
-  <p style="font-size:0.78rem;opacity:0.55;max-width:420px;text-align:center;margin-bottom:14px;">
-    Don't know? You can skip and tweak it later, or open Calibrate to swipe a 360° in your game and have it auto-detected.
+  <p style="font-size:0.7rem;opacity:0.5;max-width:480px;text-align:center;margin:14px 0;">
+    Disable Windows "Enhanced pointer precision" and use the Calibrate tool after setup for the most accurate match.
   </p>
   <div class="row">
     <button class="btn primary" id="first-run-save">Save & Continue</button>
@@ -1700,15 +1769,15 @@ function playSpawnAt(x, y, z) {
   o.stop(t + 0.24);
 }
 
-// Show direction indicator if spawn is significantly off-axis from camera view
+// Show direction indicator only for single-target scenarios when off-screen
 const _spawnVec = new THREE.Vector3();
 function maybeShowSpawnDirection(x, y, z) {
+  // Only relevant when there's a single target on the field
+  if (enemies.filter(e => !e.respawnAt).length > 1) return;
   _spawnVec.set(x, y, z);
   camera.worldToLocal(_spawnVec);
-  // Camera local: -Z is forward, +X is right, +Y is up
   const horizAngleDeg = Math.atan2(_spawnVec.x, -_spawnVec.z) * 180 / Math.PI;
   const halfFov = (Settings.fov * 0.55);
-  // In-view check: in front of camera AND within ~half FOV horizontally
   if (_spawnVec.z < 0 && Math.abs(horizAngleDeg) <= halfFov) return;
 
   let html;
@@ -1780,6 +1849,7 @@ let dodgeFill = 0;             // 0..1+, can overshoot
 let dodgeDuration = 1.5;       // seconds to reach 1.0 — varies per pattern
 let dodgeMul = 1;
 let dodgePrevStrafeKey = 'none';
+let dodgeReadyTone = false;
 
 // Pursuer direction-bar state
 let pursuerDir = 'left';
@@ -1986,16 +2056,41 @@ for (let i = 0; i < GRID_SIZE; i++) {
 }
 
 // ============================================================================
-// Enemy targets (tracking + dodge)
+// Enemy targets — Bouncing arena (3D box) for "bouncing" mode + others reuse parts
 // ============================================================================
+// Legacy panel constants kept for dodge target-around-player spawning
 const PANEL_HALF_W = 5.5;
 const PANEL_TOP    = PANEL_Y + 2.6;
 const PANEL_BOTTOM = PANEL_Y - 2.6;
-const ENEMY_BODY_SIZE = 0.45;  // sphere radius
-const ENEMY_HEAD_SIZE = 0.22;  // sphere radius
+const ENEMY_BODY_SIZE = 0.45;
+const ENEMY_HEAD_SIZE = 0.22;
 const ENEMY_Z = PANEL_Z + 0.45;
-const TRACKING_GRAVITY = 9.0;
 
+// Bouncing Targets arena
+const BOUNCE_X = 5.5;
+const BOUNCE_Y_BOT = 0.6;
+const BOUNCE_Y_TOP = 5.4;
+const BOUNCE_Z_NEAR = -2.5;
+const BOUNCE_Z_FAR = -12;
+const BOUNCE_TARGET_RADIUS = 0.32;
+const BOUNCE_MAX_SPEED = 7.5;
+const BOUNCE_TARGET_COUNT = 5;
+
+const bounceRoom = new THREE.Mesh(
+  new THREE.BoxGeometry(BOUNCE_X * 2, BOUNCE_Y_TOP - BOUNCE_Y_BOT, BOUNCE_Z_NEAR - BOUNCE_Z_FAR),
+  new THREE.MeshStandardMaterial({
+    color: 0x161a26,
+    side: THREE.BackSide,
+    metalness: 0.05,
+    roughness: 0.92
+  })
+);
+bounceRoom.position.set(0, (BOUNCE_Y_TOP + BOUNCE_Y_BOT) / 2, (BOUNCE_Z_NEAR + BOUNCE_Z_FAR) / 2);
+bounceRoom.receiveShadow = true;
+bounceRoom.visible = false;
+scene.add(bounceRoom);
+
+const bounceTargetGeo = new THREE.SphereGeometry(BOUNCE_TARGET_RADIUS, 22, 16);
 const enemyBodyGeo = new THREE.SphereGeometry(ENEMY_BODY_SIZE, 22, 16);
 const enemyHeadGeo = new THREE.SphereGeometry(ENEMY_HEAD_SIZE, 16, 12);
 
@@ -2037,6 +2132,105 @@ function makeEnemy(opts = {}) {
   enemies.push(e);
   attachHpBar(e);
   return e;
+}
+
+// === Bouncing Targets (3D box room) ===
+function makeBouncingTarget() {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(Settings.targetColor),
+    emissive: new THREE.Color(0x666666),
+    emissiveIntensity: 1.0,
+    metalness: 0.15, roughness: 0.45
+  });
+  const body = new THREE.Mesh(bounceTargetGeo, mat);
+  body.castShadow = true;
+  body.userData.part = 'body';
+  group.add(body);
+  const e = {
+    group, body, head: null, bodyMat: mat, headMat: null,
+    vx: 0, vy: 0, vz: 0,
+    hp: 1, hpMax: 1,
+    flashUntil: 0,
+    bouncing: true
+  };
+  scene.add(group);
+  enemies.push(e);
+  attachHpBar(e);
+  return e;
+}
+
+function placeBouncingTarget(e) {
+  const r = BOUNCE_TARGET_RADIUS;
+  e.group.position.set(
+    -BOUNCE_X + r + Math.random() * (BOUNCE_X * 2 - 2 * r),
+    BOUNCE_Y_BOT + r + Math.random() * (BOUNCE_Y_TOP - BOUNCE_Y_BOT - 2 * r),
+    BOUNCE_Z_FAR + r + Math.random() * (BOUNCE_Z_NEAR - BOUNCE_Z_FAR - 2 * r)
+  );
+  // Random 3D velocity, capped
+  const speed = (3.5 + Math.random() * 2.5) * Math.sqrt(currentDifficulty().speedMul);
+  const ax = Math.random() * Math.PI * 2;
+  const ay = Math.random() * Math.PI - Math.PI / 2;
+  e.vx = Math.cos(ay) * Math.cos(ax) * speed;
+  e.vy = Math.sin(ay) * speed;
+  e.vz = Math.cos(ay) * Math.sin(ax) * speed;
+  e.hp = e.hpMax;
+  playSpawnAt(e.group.position.x, e.group.position.y, e.group.position.z);
+  maybeShowSpawnDirection(e.group.position.x, e.group.position.y, e.group.position.z);
+}
+
+function updateBouncingTargets(dt) {
+  if (mode !== 'bouncing') return;
+  const r = BOUNCE_TARGET_RADIUS;
+  // Cap speeds + integrate position
+  for (const e of enemies) {
+    if (e.respawnAt) continue;
+    // clamp speed
+    const sp = Math.hypot(e.vx, e.vy, e.vz);
+    if (sp > BOUNCE_MAX_SPEED) {
+      const k = BOUNCE_MAX_SPEED / sp;
+      e.vx *= k; e.vy *= k; e.vz *= k;
+    }
+    e.group.position.x += e.vx * dt;
+    e.group.position.y += e.vy * dt;
+    e.group.position.z += e.vz * dt;
+    // Wall bounces (axis-aligned)
+    if (e.group.position.x - r < -BOUNCE_X) { e.group.position.x = -BOUNCE_X + r; e.vx =  Math.abs(e.vx); }
+    if (e.group.position.x + r >  BOUNCE_X) { e.group.position.x =  BOUNCE_X - r; e.vx = -Math.abs(e.vx); }
+    if (e.group.position.y - r < BOUNCE_Y_BOT) { e.group.position.y = BOUNCE_Y_BOT + r; e.vy =  Math.abs(e.vy); }
+    if (e.group.position.y + r > BOUNCE_Y_TOP) { e.group.position.y = BOUNCE_Y_TOP - r; e.vy = -Math.abs(e.vy); }
+    if (e.group.position.z - r < BOUNCE_Z_FAR) { e.group.position.z = BOUNCE_Z_FAR + r; e.vz =  Math.abs(e.vz); }
+    if (e.group.position.z + r > BOUNCE_Z_NEAR) { e.group.position.z = BOUNCE_Z_NEAR - r; e.vz = -Math.abs(e.vz); }
+  }
+  // Sphere-sphere collisions (equal-mass elastic)
+  const minDist = 2 * r;
+  const minDist2 = minDist * minDist;
+  for (let i = 0; i < enemies.length; i++) {
+    const a = enemies[i];
+    if (a.respawnAt || !a.bouncing) continue;
+    for (let j = i + 1; j < enemies.length; j++) {
+      const b = enemies[j];
+      if (b.respawnAt || !b.bouncing) continue;
+      const dx = b.group.position.x - a.group.position.x;
+      const dy = b.group.position.y - a.group.position.y;
+      const dz = b.group.position.z - a.group.position.z;
+      const d2 = dx*dx + dy*dy + dz*dz;
+      if (d2 < minDist2 && d2 > 0.0001) {
+        const dist = Math.sqrt(d2);
+        const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+        // Separate
+        const overlap = (minDist - dist) / 2;
+        a.group.position.x -= nx * overlap; a.group.position.y -= ny * overlap; a.group.position.z -= nz * overlap;
+        b.group.position.x += nx * overlap; b.group.position.y += ny * overlap; b.group.position.z += nz * overlap;
+        // Velocity exchange along normal (equal mass)
+        const va = a.vx*nx + a.vy*ny + a.vz*nz;
+        const vb = b.vx*nx + b.vy*ny + b.vz*nz;
+        const dv = vb - va;
+        a.vx += dv * nx; a.vy += dv * ny; a.vz += dv * nz;
+        b.vx -= dv * nx; b.vy -= dv * ny; b.vz -= dv * nz;
+      }
+    }
+  }
 }
 
 function clearEnemies() {
@@ -2335,6 +2529,20 @@ function pickPursuerDuration() {
   return 1.2 + Math.random() * 0.6;                       // 1.2–1.8s normal
 }
 
+function playSwitchTone() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(660, t);
+  o.frequency.exponentialRampToValueAtTime(880, t + 0.04);
+  g.gain.setValueAtTime(0.14 * vol(), t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.10);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t); o.stop(t + 0.12);
+}
+
 function playFlipBeep() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
@@ -2476,8 +2684,13 @@ function requestLock() {
   canvasEl.requestPointerLock?.();
 }
 
+let skipNextMouseEvents = 0;
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = document.pointerLockElement === canvasEl;
+  if (pointerLocked) {
+    // Drop the first few events after lock — they can contain huge buffered deltas
+    skipNextMouseEvents = 2;
+  }
   if (!pointerLocked && gameActive && !calibrating) {
     pauseGame();
   }
@@ -2661,7 +2874,7 @@ function shoot() {
   raycaster.set(camera.position, forward);
 
   const w = currentWeapon();
-  if (mode === 'tracking' || mode === 'dodge' || mode === 'cylinder' || mode === 'pole') {
+  if (mode === 'tracking' || mode === 'bouncing' || mode === 'dodge' || mode === 'cylinder' || mode === 'pole') {
     const parts = [];
     for (const e of enemies) {
       // Skip enemies that are dead/waiting to respawn
@@ -2887,14 +3100,14 @@ function handleEnemyHit(enemy, part) {
     score += 1;
     if (isHead) headshots++;
     let mul = 1;
-    if (mode === 'dodge') mul = dodgeMul;
-    else if (mode === 'cylinder') mul = pursuerMul;
+    if (mode === 'dodge' || mode === 'cylinder') mul = dodgeMul;
     multiplierSum += mul;
     scoreVal.textContent = score;
     playHit(isHead);
     if (isHead) showHsToast();
 
     if (mode === 'tracking') scheduleRespawn(enemy, 'tracking');
+    else if (mode === 'bouncing') scheduleRespawn(enemy, 'bouncing');
     else if (mode === 'dodge') scheduleRespawn(enemy, 'dodge');
     else if (mode === 'cylinder') scheduleRespawn(enemy, 'cylinder');
   } else if (w.auto) {
@@ -2998,6 +3211,7 @@ function animate(now) {
   // Enemy update
   if (gameActive && !gamePaused) {
     if (mode === 'tracking') updateEnemies(dt);
+    else if (mode === 'bouncing') updateBouncingTargets(dt);
     else if (mode === 'cylinder') updateCylinders(dt);
   }
 
@@ -3008,6 +3222,7 @@ function animate(now) {
         e.respawnAt = 0;
         e.group.visible = true;
         if (e.respawnMode === 'tracking') placeEnemyOnPanel(e);
+        else if (e.respawnMode === 'bouncing') placeBouncingTarget(e);
         else if (e.respawnMode === 'dodge') placeEnemyAroundPlayer(e);
         else if (e.respawnMode === 'cylinder') placeCylinder(e);
       }
@@ -3069,46 +3284,11 @@ function animate(now) {
     }
   }
 
-  // Pursuer direction-bar update
-  if (mode === 'cylinder' && gameActive && !gamePaused) {
-    pursuerFill += dt / pursuerCurrentDur;
-    if (pursuerFill >= 1) {
-      pursuerFill = 0;
-      pursuerDir = (pursuerDir === 'left') ? 'right' : 'left';
-      pursuerCurrentDur = pickPursuerDuration();
-      pursuerLastFlipTime = now;
-      playFlipBeep();
-    }
-    dirBarFill.style.width = (pursuerFill * 100) + '%';
-    dirBarText.textContent = (pursuerDir === 'left') ? '← STRAFE LEFT' : 'STRAFE RIGHT →';
-
-    const left  = !!keys['KeyA'] && !keys['KeyD'];
-    const right = !!keys['KeyD'] && !keys['KeyA'];
-    const strafeKey = left ? 'left' : (right ? 'right' : 'none');
-
-    // Track when the player changed strafe direction
-    if (strafeKey !== pursuerPrevStrafeKey) {
-      pursuerLastStrafeChangeTime = now;
-      pursuerPrevStrafeKey = strafeKey;
-    }
-
-    const correct = (pursuerDir === strafeKey);
-    const reactionDelay = pursuerLastStrafeChangeTime - pursuerLastFlipTime;
-    const reactiveStrafe = reactionDelay >= REACT_WINDOW_MIN && reactionDelay <= REACT_WINDOW_MAX;
-
-    // Perfect = correct direction AND change happened in reactive window
-    if (correct && reactiveStrafe) pursuerMul = 2;
-    else if (correct)              pursuerMul = 1;
-    else                           pursuerMul = (left || right) ? 0.5 : 0.25;
-
-    dirBar.classList.toggle('perfect', correct && reactiveStrafe);
-    dirBar.classList.toggle('correct', correct && !reactiveStrafe);
-    dirBar.classList.toggle('wrong',   !correct && (left || right));
-  }
-
-  // Dodge / Pole bar update — player-driven fill, switching at the green zone earns max points
-  if ((mode === 'dodge' || mode === 'pole') && gameActive && !gamePaused) {
-    dodgeFill += dt / dodgeDuration;
+  // Dodge / Pole / Pursuer bar update — player-driven fill, switching at the green zone earns max points
+  if ((mode === 'dodge' || mode === 'pole' || mode === 'cylinder') && gameActive && !gamePaused) {
+    // Bar fill only progresses while the player is actively strafing
+    const strafingNow = !!(keys['KeyA'] || keys['KeyD']);
+    if (strafingNow) dodgeFill += dt / dodgeDuration;
 
     const left  = !!keys['KeyA'] && !keys['KeyD'];
     const right = !!keys['KeyD'] && !keys['KeyA'];
@@ -3133,8 +3313,17 @@ function animate(now) {
     dodgeFillEl.style.width = (visualFill * 100) + '%';
     const inIdeal = dodgeFill >= 0.75 && dodgeFill <= 1.15;
     const overshoot = dodgeFill > 1.15;
+    const soon = dodgeFill >= 0.55 && dodgeFill < 0.75;
+    dodgeBar.classList.toggle('soon', soon);
     dodgeBar.classList.toggle('ready', inIdeal && !overshoot);
     dodgeBar.classList.toggle('overshoot', overshoot);
+    // Tone the moment we enter the green zone
+    if (inIdeal && !overshoot && !dodgeReadyTone) {
+      dodgeReadyTone = true;
+      playSwitchTone();
+    } else if (!inIdeal || overshoot) {
+      dodgeReadyTone = false;
+    }
     dodgeArrow.textContent = 'STRAFE TIMING';
   }
 
@@ -3185,6 +3374,7 @@ function showMainMenu() {
   dirBar.classList.remove('show');
   weaponHud.classList.remove('show');
   dodgeRoom.visible = false;
+  bounceRoom.visible = false;
   backWall.visible = true;
   for (const t of tileMeshes) t.visible = true;
   clearEnemies();
@@ -3231,6 +3421,7 @@ function startGame(m, lockedWeapon = null) {
 
   // Configure scene per mode
   dodgeRoom.visible = false;
+  bounceRoom.visible = false;
   dodgeBar.classList.remove('show');
   dirBar.classList.remove('show');
   weaponHud.classList.add('show');
@@ -3260,6 +3451,20 @@ function startGame(m, lockedWeapon = null) {
     }
     timerDuration = TRACKING_DURATION;
     timerDisplay.style.display = 'inline';
+  } else if (mode === 'bouncing') {
+    for (const t of tileMeshes) t.visible = false;
+    backWall.visible = false;
+    bounceRoom.visible = true;
+    // Aim camera at the center of the bounce room
+    const targetY = (BOUNCE_Y_TOP + BOUNCE_Y_BOT) / 2;
+    const targetZ = (BOUNCE_Z_NEAR + BOUNCE_Z_FAR) / 2;
+    pitch = Math.atan((targetY - camera.position.y) / -targetZ);
+    for (let i = 0; i < BOUNCE_TARGET_COUNT; i++) {
+      const e = makeBouncingTarget();
+      placeBouncingTarget(e);
+    }
+    timerDuration = TRACKING_DURATION;
+    timerDisplay.style.display = 'inline';
   } else if (mode === 'dodge') {
     for (const t of tileMeshes) t.visible = false;
     backWall.visible = false;
@@ -3284,18 +3489,17 @@ function startGame(m, lockedWeapon = null) {
     backWall.visible = false;
     dodgeRoom.visible = true;
     pitch = 0;
-    pursuerDir = Math.random() < 0.5 ? 'left' : 'right';
-    pursuerFill = 0;
-    pursuerMul = 1;
-    pursuerCurrentDur = pickPursuerDuration();
-    pursuerLastFlipTime = performance.now();
-    pursuerLastStrafeChangeTime = -10000;
-    pursuerPrevStrafeKey = 'none';
+    // Pursuer now uses the player-driven dodge bar
+    dodgeBar.classList.add('show');
+    dodgeBar.classList.remove('ready', 'overshoot', 'soon');
+    dodgeFill = 0;
+    dodgeDuration = pickPursuerDuration();
+    dodgeMul = 1;
+    dodgePrevStrafeKey = 'none';
+    // Reactivity tracking stays (cylinder bot strafe vs mouse)
     pursuerReactiveSamples = [];
     pursuerCorrectSamples = [];
     pursuerReactPhase = 0;
-    dirBar.classList.add('show');
-    dirBar.classList.remove('correct', 'wrong', 'perfect');
     const e = makeCylinder();
     placeCylinder(e);
     timerDuration = CYLINDER_DURATION;
@@ -3406,6 +3610,10 @@ function gameOver(won) {
     title = 'Time Up'; titleClass = 'complete';
     headline = score; headSub = `${headshots} Headshots`;
     bestKey = 'tracking'; bestVal = score;
+  } else if (mode === 'bouncing') {
+    title = 'Time Up'; titleClass = 'complete';
+    headline = score; headSub = 'Targets Hit';
+    bestKey = 'bouncing'; bestVal = score;
   } else if (mode === 'dodge') {
     title = 'Time Up'; titleClass = 'complete';
     headline = weightedFinal; headSub = `${score} hits · ×${avgMul.toFixed(2)} avg`;
@@ -3853,22 +4061,81 @@ $('chart-score').parentElement.addEventListener('click', openHistory);
 $('chart-acc').parentElement.addEventListener('click', openHistory);
 
 // ============================================================================
-// First-run sensitivity prompt
+// First-run sensitivity prompt — game presets + conversion
 // ============================================================================
+// Each preset converts in-game sens → degrees per mouse count via the formula:
+//   degrees_per_count = sens * yawConst
+// Then in/360° = 360 / (degrees_per_count * dpi)
+const GAME_PRESETS = [
+  { id: 'overwatch', name: 'Overwatch / OW2', yaw: 0.0066, defaultSens: 5.0 },
+  { id: 'valorant',  name: 'Valorant',         yaw: 0.07,   defaultSens: 0.4 },
+  { id: 'cs2',       name: 'CS2 / CSGO',       yaw: 0.022,  defaultSens: 1.5 },
+  { id: 'apex',      name: 'Apex Legends',     yaw: 0.022,  defaultSens: 1.5 },
+  { id: 'fortnite',  name: 'Fortnite',         yaw: 0.5715, defaultSens: 0.06 },
+  { id: 'r6',        name: 'Rainbow Six Siege',yaw: 0.00572,defaultSens: 30 },
+  { id: 'cod',       name: 'Call of Duty (MW2/MW3)', yaw: 0.0066, defaultSens: 6.0 },
+  { id: 'quake',     name: 'Quake',            yaw: 0.022,  defaultSens: 2.0 },
+  { id: 'in360',     name: 'inches / 360° (direct)', yaw: null, defaultSens: 15.4083 }
+];
+
 const firstRunScreen = $('first-run');
-const firstRunInput = $('first-run-input');
+const frDpi = $('fr-dpi');
+const frGame = $('fr-game');
+const frSens = $('fr-sens');
+const frConverted = $('fr-converted');
+
+// Populate game dropdown
+for (const g of GAME_PRESETS) {
+  const opt = document.createElement('option');
+  opt.value = g.id;
+  opt.textContent = g.name;
+  frGame.appendChild(opt);
+}
+frGame.value = 'overwatch';
+
+function getSelectedPreset() {
+  return GAME_PRESETS.find(g => g.id === frGame.value) || GAME_PRESETS[0];
+}
+
+function recomputeFirstRun() {
+  const dpi = parseFloat(frDpi.value) || 1000;
+  const sens = parseFloat(frSens.value);
+  const preset = getSelectedPreset();
+  if (!isFinite(sens) || sens <= 0) { frConverted.textContent = '— in / 360°'; return null; }
+  let in360;
+  if (preset.yaw === null) {
+    // Direct in/360° entry
+    in360 = sens;
+  } else {
+    const degPerCount = sens * preset.yaw;
+    if (degPerCount <= 0) { frConverted.textContent = '— in / 360°'; return null; }
+    in360 = 360 / (degPerCount * dpi);
+  }
+  frConverted.textContent = in360.toFixed(4) + ' in / 360°';
+  return in360;
+}
+
+frGame.addEventListener('change', () => {
+  const p = getSelectedPreset();
+  frSens.value = p.defaultSens;
+  recomputeFirstRun();
+});
+frDpi.addEventListener('input', recomputeFirstRun);
+frSens.addEventListener('input', recomputeFirstRun);
 
 function showFirstRun() {
-  firstRunInput.value = inchesPer360.toFixed(4);
+  // Default to a sensible starting point
+  if (!frDpi.value) frDpi.value = 1000;
+  if (!frSens.value) frSens.value = getSelectedPreset().defaultSens;
+  recomputeFirstRun();
   showOnly(firstRunScreen);
-  setTimeout(() => firstRunInput.focus(), 50);
 }
 
 $('first-run-save').onclick = () => {
-  const v = parseFloat(firstRunInput.value);
-  if (v > 0 && isFinite(v)) {
+  const v = recomputeFirstRun();
+  if (v && v > 0 && isFinite(v)) {
     setInches(v);
-    calInput.value = v;
+    calInput.value = v.toFixed(4);
   }
   localStorage.setItem('first_run_done', '1');
   showMainMenu();
@@ -3877,9 +4144,6 @@ $('first-run-skip').onclick = () => {
   localStorage.setItem('first_run_done', '1');
   showMainMenu();
 };
-firstRunInput.addEventListener('keydown', (e) => {
-  if (e.code === 'Enter') $('first-run-save').click();
-});
 
 // ============================================================================
 // Initial sync
