@@ -1782,7 +1782,7 @@
             <option value="hard">Hard</option>
           </select>
         </div>
-        <div class="field"><label>Walk speed (m/s)</label><input type="range" id="set-speed" min="3" max="9" step="0.1"><span class="value" id="set-speed-v"></span></div>
+        <div class="field"><label>Walk speed (m/s)</label><input type="range" id="set-speed" min="3" max="12" step="0.1"><span class="value" id="set-speed-v"></span></div>
         <div class="field"><label>Tracking targets</label><input type="number" id="set-tracking-count" min="1" max="8"></div>
       </div>
     </div>
@@ -1977,7 +1977,7 @@ const DEFAULT_SETTINGS = {
   headColor: '#ff6b6b',
   fov: 90,
   difficulty: 'normal',
-  walkSpeed: 5.5,
+  walkSpeed: 7.3,
   trackingCount: 4,
   weapon: 'hitscan',
   hudInset: 16,
@@ -3248,8 +3248,8 @@ for (const slot of weaponHud.querySelectorAll('.weapon-slot')) {
 // ============================================================================
 // Movement (snappy FPS-feel: high accel, quick stop)
 // ============================================================================
-const MOVE_ACCEL = 60;     // m/s² (snappy)
-const MOVE_FRICTION = 14;  // friction when no input
+const MOVE_ACCEL = 80;     // m/s² (snappy)
+const MOVE_FRICTION = 18;  // friction when no input
 
 function updateMovement(dt) {
   const movementMode = (mode === 'dodge' || mode === 'cylinder' || mode === 'pole');
