@@ -1817,6 +1817,10 @@
         <input type="range" id="pc-dir" min="0.4" max="2.5" step="0.05">
         <span class="value" id="pc-dir-v">×1.00</span>
       </div>
+      <div class="field"><label>Target HP</label>
+        <input type="range" id="pc-hp" min="0.25" max="5" step="0.25">
+        <span class="value" id="pc-hp-v">×1.00</span>
+      </div>
       <div class="row" style="margin-top:10px; justify-content:flex-start;">
         <button class="btn muted" id="pc-reset">Reset</button>
       </div>
@@ -2028,6 +2032,10 @@
           <input type="range" id="sd-cust-dir" min="0.4" max="2.5" step="0.05">
           <span class="value" id="sd-cust-dir-v">×1.00</span>
         </div>
+        <div class="field"><label>Target HP</label>
+          <input type="range" id="sd-cust-hp" min="0.25" max="5" step="0.25">
+          <span class="value" id="sd-cust-hp-v">×1.00</span>
+        </div>
         <div class="field"><label>Use custom settings</label>
           <input type="checkbox" id="sd-cust-enable">
         </div>
@@ -2149,12 +2157,12 @@ const DEFAULT_SETTINGS = {
   hudInset: 16,
   playerName: '',
   submitScores: true,
-  // Per-scenario custom multipliers (size, speed, dirChange) + enabled flag
+  // Per-scenario custom multipliers (size, speed, dirChange, hp) + enabled flag
   customScenarios: {
-    bouncing: { size: 1, speed: 1, dir: 1, enabled: false },
-    cylinder: { size: 1, speed: 1, dir: 1, enabled: false },
-    dodge:    { size: 1, speed: 1, dir: 1, enabled: false },
-    pole:     { size: 1, speed: 1, dir: 1, enabled: false }
+    bouncing: { size: 1, speed: 1, dir: 1, hp: 1, enabled: false },
+    cylinder: { size: 1, speed: 1, dir: 1, hp: 1, enabled: false },
+    dodge:    { size: 1, speed: 1, dir: 1, hp: 1, enabled: false },
+    pole:     { size: 1, speed: 1, dir: 1, hp: 1, enabled: false }
   }
 };
 
@@ -2465,7 +2473,8 @@ let shotsHit = 0;
 let headshots = 0;
 let streak = 0;
 let bestStreak = 0;
-let multiplierSum = 0;  // sum of movement multipliers across all kills (applied at end)
+let multiplierSum = 0;  // weighted damage total (dmg * mul); shown as final score
+let rawDamageDealt = 0; // unweighted damage total — used to derive avg mul on game over
 let startTime = 0;
 let pausedAt = 0;
 let totalPausedMs = 0;
@@ -2712,7 +2721,7 @@ const BOUNCE_Y_BOT = 0.6;
 const BOUNCE_Y_TOP = 5.4;
 const BOUNCE_Z_NEAR = -2.5;
 const BOUNCE_Z_FAR = -12;
-const BOUNCE_TARGET_RADIUS = 0.32;
+const BOUNCE_TARGET_RADIUS = 0.22;
 const BOUNCE_MAX_SPEED = 7.5;
 const BOUNCE_TARGET_COUNT = 5;
 
@@ -2762,10 +2771,12 @@ function makeEnemy(opts = {}) {
   head.userData.part = 'head';
   group.add(head);
 
+  const hpMul = currentDifficulty().hpMul || 1;
+  const hp = 2 * hpMul;
   const e = {
     group, body, head, bodyMat, headMat,
     vx: 0, vy: 0,
-    hp: 2, hpMax: 2,
+    hp, hpMax: hp,
     dirChangeTimer: 0,
     flashUntil: 0
   };
@@ -2790,10 +2801,12 @@ function makeBouncingTarget() {
   const scale = currentDifficulty().targetScale;
   body.scale.setScalar(scale);
   group.add(body);
+  const hpMul = currentDifficulty().hpMul || 1;
+  const hp = 1 * hpMul;
   const e = {
     group, body, head: null, bodyMat: mat, headMat: null,
     vx: 0, vy: 0, vz: 0,
-    hp: 1, hpMax: 1,
+    hp, hpMax: hp,
     radius: BOUNCE_TARGET_RADIUS * scale,
     flashUntil: 0,
     bouncing: true
@@ -3033,10 +3046,12 @@ function makeCylinder() {
   head.userData.part = 'head';
   group.add(head);
 
+  const hpMul = currentDifficulty().hpMul || 1;
+  const hp = CYLINDER_HP * hpMul;
   const e = {
     group, body, head, bodyMat, headMat,
     vx: 0, vz: 0,
-    hp: CYLINDER_HP, hpMax: CYLINDER_HP,
+    hp, hpMax: hp,
     strafeDir: Math.random() < 0.5 ? -1 : 1,
     strafeTimer: 0.5 + Math.random() * 1.5,
     flashUntil: 0,
@@ -3174,10 +3189,12 @@ function currentDifficulty() {
       speedMul:    activeCustomCfg.speed,
       headScale:   base.headScale,
       dirChangeMs: base.dirChangeMs / Math.max(0.1, activeCustomCfg.dir),
-      targetScale: activeCustomCfg.size
+      targetScale: activeCustomCfg.size,
+      hpMul:       activeCustomCfg.hp || 1
     };
   }
-  return DIFFICULTY[Settings.difficulty] || DIFFICULTY.normal;
+  const d = DIFFICULTY[Settings.difficulty] || DIFFICULTY.normal;
+  return { ...d, hpMul: 1 };
 }
 
 let activeCustomMode = false;
@@ -3936,14 +3953,17 @@ function handleEnemyHit(enemy, part) {
   bumpStreak();
   const isHead = part === 'head';
   const w = currentWeapon();
+  // Current movement multiplier (1 outside movement scenarios)
+  const mul = (mode === 'dodge' || mode === 'cylinder' || mode === 'pole') ? dodgeMul : 1;
 
-  // Pole Practice: pole is invincible — every hit is +1 raw, dodge-bar multiplier accumulated
+  // Pole Practice: pole is invincible — each hit counts as 1 damage × mul
   if (enemy.pole) {
     pulseHitMarker(false);
     enemy.flashUntil = performance.now() + 90;
-    score += 1;
-    multiplierSum += dodgeMul;
-    scoreVal.textContent = score;
+    rawDamageDealt += 1;
+    score += 1 * mul;
+    multiplierSum = score;
+    scoreVal.textContent = Math.round(score);
     playHit(false);
     return;
   }
@@ -3953,16 +3973,16 @@ function handleEnemyHit(enemy, part) {
   enemy.flashUntil = performance.now() + 90;
   pulseHitMarker(isHead);
 
+  // Every damage-dealing hit contributes dmg × mul to score (regardless of kill/no-kill)
+  rawDamageDealt += dmg;
+  score += dmg * mul;
+  multiplierSum = score;
+  scoreVal.textContent = Math.round(score);
+
   if (enemy.hp <= 0) {
-    score += 1;
     if (isHead) headshots++;
-    let mul = 1;
-    if (mode === 'dodge' || mode === 'cylinder') mul = dodgeMul;
-    multiplierSum += mul;
-    scoreVal.textContent = score;
     playHit(isHead);
     if (isHead) showHsToast();
-
     if (mode === 'tracking') scheduleRespawn(enemy, 'tracking');
     else if (mode === 'bouncing') scheduleRespawn(enemy, 'bouncing');
     else if (mode === 'dodge') scheduleRespawn(enemy, 'dodge');
@@ -4003,7 +4023,8 @@ function handleTap(index) {
   if (!gameActive) return;
   if (blackTiles.has(index)) {
     shotsHit++; score++;
-    multiplierSum += 1;
+    rawDamageDealt += 1;
+    multiplierSum = score;
     bumpStreak();
     pulseHitMarker(false);
     scoreVal.textContent = score;
@@ -4027,7 +4048,8 @@ function handleFlickHit(index) {
   if (!gameActive) return;
   if (blackTiles.has(index)) {
     shotsHit++; score++;
-    multiplierSum += 1;
+    rawDamageDealt += 1;
+    multiplierSum = score;
     bumpStreak();
     pulseHitMarker(false);
     scoreVal.textContent = score;
@@ -4266,6 +4288,7 @@ function startGame(m, lockedWeapon = null) {
   score = 0; shotsFired = 0; shotsHit = 0; headshots = 0;
   streak = 0; bestStreak = 0;
   multiplierSum = 0;
+  rawDamageDealt = 0;
   updateStreak();
   gameActive = true;
   gamePaused = false;
@@ -4481,6 +4504,8 @@ function syncCustomizeSliders() {
   $('pc-speed-v').textContent = '×' + Number(cfg.speed).toFixed(2);
   $('pc-dir').value = cfg.dir;
   $('pc-dir-v').textContent = '×' + Number(cfg.dir).toFixed(2);
+  $('pc-hp').value = cfg.hp || 1;
+  $('pc-hp-v').textContent = '×' + Number(cfg.hp || 1).toFixed(2);
 }
 
 // Pause menu difficulty buttons — preview only, don't restart
@@ -4505,10 +4530,11 @@ function handleResumeClick() {
     cfg.size = parseFloat($('pc-size').value);
     cfg.speed = parseFloat($('pc-speed').value);
     cfg.dir = parseFloat($('pc-dir').value);
+    cfg.hp = parseFloat($('pc-hp').value);
     cfg.enabled = true;
     saveSettings();
     activeCustomMode = true;
-    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir };
+    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir, hp: cfg.hp };
   } else {
     Settings.difficulty = pausePreviewDiff;
     saveSettings();
@@ -4537,6 +4563,7 @@ function bindPauseSlider(id, vId, key) {
 bindPauseSlider('pc-size', 'pc-size-v', 'size');
 bindPauseSlider('pc-speed', 'pc-speed-v', 'speed');
 bindPauseSlider('pc-dir', 'pc-dir-v', 'dir');
+bindPauseSlider('pc-hp', 'pc-hp-v', 'hp');
 
 // Preset-load buttons inside the customize section — fill sliders with that preset's values
 for (const pb of document.querySelectorAll('.preset-btn')) {
@@ -4547,8 +4574,8 @@ for (const pb of document.querySelectorAll('.preset-btn')) {
     const cfg = Settings.customScenarios[mode];
     cfg.size = d.targetScale;
     cfg.speed = d.speedMul;
-    // dirChange ratio — easy slows direction changes, hard speeds them up
     cfg.dir = preset === 'easy' ? 0.7 : preset === 'hard' ? 1.5 : 1.0;
+    cfg.hp = 1;
     saveSettings();
     syncCustomizeSliders();
   });
@@ -4556,7 +4583,7 @@ for (const pb of document.querySelectorAll('.preset-btn')) {
 
 $('pc-reset').onclick = () => {
   if (!mode) return;
-  Settings.customScenarios[mode] = { size: 1, speed: 1, dir: 1, enabled: false };
+  Settings.customScenarios[mode] = { size: 1, speed: 1, dir: 1, hp: 1, enabled: false };
   saveSettings();
   syncCustomizeSliders();
 };
@@ -4588,9 +4615,9 @@ function gameOver(won) {
   // Default-hide the scoreboard label; the bestKey branch below re-enables it
   $('scoreboard-label').style.display = 'none';
 
-  // Apply movement multiplier to compute weighted final score
-  const avgMul = score > 0 ? (multiplierSum / score) : 1;
-  const weightedFinal = Math.round(multiplierSum);
+  // Damage-based final — score already contains the weighted dmg*mul total
+  const avgMul = rawDamageDealt > 0 ? (score / rawDamageDealt) : 1;
+  const weightedFinal = Math.round(score);
   const usesMul = (mode === 'dodge' || mode === 'cylinder' || mode === 'pole');
 
   let bestKey, bestVal, lower = false;
@@ -4624,11 +4651,11 @@ function gameOver(won) {
     bestKey = 'tracking'; bestVal = score;
   } else if (mode === 'bouncing') {
     title = 'Time Up'; titleClass = 'complete';
-    headline = score; headSub = 'Targets Hit';
-    bestKey = 'bouncing'; bestVal = score;
+    headline = weightedFinal; headSub = `${Math.round(rawDamageDealt)} dmg`;
+    bestKey = 'bouncing'; bestVal = weightedFinal;
   } else if (mode === 'dodge') {
     title = 'Time Up'; titleClass = 'complete';
-    headline = weightedFinal; headSub = `${score} hits · ×${avgMul.toFixed(2)} avg`;
+    headline = weightedFinal; headSub = `${Math.round(rawDamageDealt)} dmg · ×${avgMul.toFixed(2)} avg`;
     bestKey = 'dodge'; bestVal = weightedFinal;
   } else if (mode === 'flicks') {
     title = 'Time Up'; titleClass = 'complete';
@@ -4636,11 +4663,11 @@ function gameOver(won) {
     bestKey = 'flicks'; bestVal = score;
   } else if (mode === 'cylinder') {
     title = 'Time Up'; titleClass = 'complete';
-    headline = weightedFinal; headSub = `${score} hits · ${headshots} HS · ×${avgMul.toFixed(2)} avg`;
+    headline = weightedFinal; headSub = `${Math.round(rawDamageDealt)} dmg · ${headshots} HS · ×${avgMul.toFixed(2)} avg`;
     bestKey = 'cylinder'; bestVal = weightedFinal;
   } else if (mode === 'pole') {
     title = 'Time Up'; titleClass = 'complete';
-    headline = weightedFinal; headSub = `${score} hits · ×${avgMul.toFixed(2)} avg`;
+    headline = weightedFinal; headSub = `${Math.round(rawDamageDealt)} dmg · ×${avgMul.toFixed(2)} avg`;
     bestKey = 'pole'; bestVal = weightedFinal;
   }
 
@@ -5047,13 +5074,15 @@ async function openScenarioDetail(modeKey) {
   $('sd-play-track').classList.toggle('selected', Settings.weapon === 'tracking' || isPoleOnly);
 
   // Sync customize UI from saved per-scenario settings
-  const cfg = Settings.customScenarios[modeKey] || { size: 1, speed: 1, dir: 1, enabled: false };
+  const cfg = Settings.customScenarios[modeKey] || { size: 1, speed: 1, dir: 1, hp: 1, enabled: false };
   $('sd-cust-size').value = cfg.size;
   $('sd-cust-size-v').textContent = '×' + Number(cfg.size).toFixed(2);
   $('sd-cust-speed').value = cfg.speed;
   $('sd-cust-speed-v').textContent = '×' + Number(cfg.speed).toFixed(2);
   $('sd-cust-dir').value = cfg.dir;
   $('sd-cust-dir-v').textContent = '×' + Number(cfg.dir).toFixed(2);
+  $('sd-cust-hp').value = cfg.hp || 1;
+  $('sd-cust-hp-v').textContent = '×' + Number(cfg.hp || 1).toFixed(2);
   $('sd-cust-enable').checked = !!cfg.enabled;
   if (cfg.enabled) $('sd-customize').setAttribute('open', '');
 
@@ -5083,7 +5112,7 @@ function startFromDetail(weapon) {
   const cfg = Settings.customScenarios[sdMode];
   if (cfg && cfg.enabled) {
     activeCustomMode = true;
-    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir };
+    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir, hp: cfg.hp || 1 };
   } else {
     activeCustomMode = false;
     activeCustomCfg = null;
@@ -5109,6 +5138,7 @@ function bindCustomSlider(id, vId, key) {
 bindCustomSlider('sd-cust-size', 'sd-cust-size-v', 'size');
 bindCustomSlider('sd-cust-speed', 'sd-cust-speed-v', 'speed');
 bindCustomSlider('sd-cust-dir', 'sd-cust-dir-v', 'dir');
+bindCustomSlider('sd-cust-hp', 'sd-cust-hp-v', 'hp');
 
 $('sd-cust-enable').addEventListener('change', () => {
   if (sdMode) {
@@ -5119,7 +5149,7 @@ $('sd-cust-enable').addEventListener('change', () => {
 
 $('sd-cust-reset').onclick = () => {
   if (!sdMode) return;
-  Settings.customScenarios[sdMode] = { size: 1, speed: 1, dir: 1, enabled: false };
+  Settings.customScenarios[sdMode] = { size: 1, speed: 1, dir: 1, hp: 1, enabled: false };
   saveSettings();
   openScenarioDetail(sdMode); // re-render
 };
