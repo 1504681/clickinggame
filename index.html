@@ -985,6 +985,34 @@
     color: var(--text);
   }
 
+  /* Hardware-accel warnings */
+  .hwaccel-warn {
+    background: rgba(239,68,68,0.16);
+    border: 1px solid var(--danger);
+    border-left-width: 4px;
+    border-radius: var(--r);
+    padding: 14px 18px;
+    max-width: 540px;
+    color: #fecaca;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin-bottom: 18px;
+    text-align: left;
+  }
+  .hwaccel-warn b { color: var(--danger); font-size: 0.95rem; }
+  .hwaccel-banner {
+    background: rgba(239,68,68,0.18);
+    border: 1px solid var(--danger);
+    border-radius: var(--r);
+    padding: 10px 16px;
+    max-width: 520px;
+    color: #fecaca;
+    font-size: 0.8rem;
+    margin: 8px 0 16px;
+    text-align: center;
+    font-weight: 600;
+  }
+
   /* Welcome form */
   .fr-grid {
     display: grid;
@@ -1549,6 +1577,9 @@
 <div id="menu" class="screen show">
   <h1>Browser Aim Trainer<span class="badge">3D · FPS</span></h1>
   <div class="sens">F Fullscreen · ESC Pause · R Restart · 1/2 Switch Weapon</div>
+  <div id="hwaccel-banner" class="hwaccel-banner" style="display:none;">
+    ⚠ Software rendering detected — enable Hardware Acceleration in your browser settings, otherwise the game will be unplayable.
+  </div>
 
   <div class="cal">
     <div class="row">
@@ -1766,6 +1797,10 @@
 <!-- First-run sensitivity prompt -->
 <div id="first-run" class="screen">
   <h1>Welcome</h1>
+  <div class="hwaccel-warn">
+    <b>⚠ Hardware Acceleration Required</b><br>
+    This game runs on WebGL. If your browser has hardware/graphics acceleration turned off, the game will be a stuttery slideshow and basically unplayable. Make sure it is enabled in your browser settings before continuing.
+  </div>
   <p style="max-width:520px;text-align:center;margin-bottom:18px;">
     Pick the game whose sensitivity you want to match, enter your in-game value, and we'll convert it.
   </p>
@@ -5030,6 +5065,19 @@ syncSettingsUI();
 camera.fov = Settings.fov;
 camera.updateProjectionMatrix();
 document.documentElement.style.setProperty('--hud-inset', Settings.hudInset + 'px');
+
+// Detect software rendering — if WebGL is using SwiftShader/llvmpipe/etc, show a warning banner
+try {
+  const gl = renderer.getContext();
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  const rendererStr = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '';
+  const lower = (rendererStr || '').toLowerCase();
+  const isSoftware = /swiftshader|llvmpipe|software|microsoft basic render/.test(lower);
+  if (isSoftware) {
+    const banner = $('hwaccel-banner');
+    if (banner) banner.style.display = 'block';
+  }
+} catch (e) {}
 
 if (!localStorage.getItem('first_run_done')) {
   showFirstRun();

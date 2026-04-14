@@ -4,6 +4,12 @@ A self-contained browser FPS aim trainer with movement, multiple scenarios, cust
 
 🎯 **Live:** [https://1504681.github.io/BrowserAimTrainer/](https://1504681.github.io/BrowserAimTrainer/)
 
+> ⚠️ **REQUIRES BROWSER HARDWARE ACCELERATION.** This is a WebGL game. If your browser has hardware/graphics acceleration disabled it will fall back to software rendering (SwiftShader / llvmpipe), and the game will be a stuttery slideshow. Make sure it's enabled in your browser settings before playing.
+>
+> - **Chrome / Edge**: Settings → System → "Use graphics acceleration when available" → ON
+> - **Firefox**: Settings → General → Performance → "Use recommended performance settings" or "Use hardware acceleration when available"
+> - The trainer will warn you on the menu if it detects software rendering.
+
 ---
 
 ## Features
