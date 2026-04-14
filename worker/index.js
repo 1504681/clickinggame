@@ -73,12 +73,25 @@ async function putScores(env, key, arr) {
   await env.SCORES.put('lb:' + key, JSON.stringify(arr));
 }
 
+function dedupeByName(arr) {
+  const sorted = arr.slice().sort((a, b) => b.score - a.score);
+  const seen = new Set();
+  const out = [];
+  for (const r of sorted) {
+    const n = r.name || 'Anon';
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(r);
+  }
+  return out;
+}
+
 async function handleGet(req, env) {
   const url = new URL(req.url);
   const key = url.searchParams.get('key');
   if (!isValidKey(key)) return json({ error: 'invalid key' }, 400);
   const arr = await getScores(env, key);
-  return json({ scores: arr });
+  return json({ scores: dedupeByName(arr) });
 }
 
 async function handlePost(req, env) {
@@ -108,12 +121,21 @@ async function handlePost(req, env) {
 
   const arr = await getScores(env, key);
   arr.push(entry);
-  // Sort descending by score, keep top MAX_KEEP
+  // Sort descending by score
   arr.sort((a, b) => b.score - a.score);
-  while (arr.length > MAX_KEEP) arr.pop();
-  await putScores(env, key, arr);
+  // Dedupe by name — keep only the highest score per player (first occurrence after sort)
+  const seen = new Set();
+  const deduped = [];
+  for (const r of arr) {
+    const n = r.name || 'Anon';
+    if (seen.has(n)) continue;
+    seen.add(n);
+    deduped.push(r);
+  }
+  while (deduped.length > MAX_KEEP) deduped.pop();
+  await putScores(env, key, deduped);
 
-  return json({ ok: true, scores: arr, rank: arr.indexOf(entry) + 1 });
+  return json({ ok: true, scores: deduped, rank: deduped.indexOf(entry) + 1 });
 }
 
 export default {

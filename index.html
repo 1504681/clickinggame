@@ -4196,6 +4196,15 @@ function refreshLeaderboard(modeKey, fullKey, lower) {
   }
   arr.sort((a, b) => lower ? (a.score - b.score) : (b.score - a.score));
 
+  // Dedupe by name — each player appears once with their best score only
+  const seenNames = new Set();
+  arr = arr.filter(r => {
+    const n = r.name || 'Anon';
+    if (seenNames.has(n)) return false;
+    seenNames.add(n);
+    return true;
+  });
+
   const rowsEl = $('lb-rows');
   rowsEl.innerHTML = '';
   if (arr.length === 0) {
@@ -5101,11 +5110,11 @@ function gameOver(won) {
       }
     }
     // Persist this run to history (separate from PB)
-    const histScore = lower ? parseFloat(elapsed) : (usesMul ? weightedFinal : score);
+    const histScore = lower ? parseFloat(elapsed) : (usesMul ? weightedFinal : Math.round(score));
     history = pushRunHistory(fullKey, {
       score: histScore,
       acc,
-      hits: score,
+      hits: shotsHit,       // integer count of damage-dealing hit events
       headshots,
       mul: avgMul,
       streak: bestStreak,
