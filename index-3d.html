@@ -655,26 +655,93 @@
     margin-bottom: 18px;
   }
 
+  .result-headline.pb {
+    color: var(--gold);
+    text-shadow: 0 0 36px rgba(251,191,36,0.7), 0 0 72px rgba(251,191,36,0.35);
+    animation: pbPulse 0.7s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes pbPulse {
+    0%   { transform: scale(0.55); opacity: 0; }
+    35%  { transform: scale(1.18); opacity: 1; }
+    65%  { transform: scale(0.96); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
   .pb-pill {
     display: inline-block;
-    padding: 6px 14px;
+    padding: 8px 18px;
     background: linear-gradient(135deg, var(--gold), #fb923c);
     color: #000;
     border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 800;
-    letter-spacing: 1.5px;
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 2px;
     text-transform: uppercase;
-    margin-bottom: 14px;
-    box-shadow: 0 0 24px rgba(251,191,36,0.4);
+    margin-bottom: 10px;
+    box-shadow: 0 0 28px rgba(251,191,36,0.55);
+    animation: pillPop 0.7s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes pillPop {
+    0%   { transform: scale(0.5); opacity: 0; }
+    50%  { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .pb-delta {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--success);
+    margin-bottom: 16px;
+    letter-spacing: 0.3px;
+    text-shadow: 0 0 18px rgba(16,185,129,0.35);
+  }
+  .pb-delta.bad {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-shadow: none;
   }
   .pb-line {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-bottom: 18px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
   }
-  .pb-line .delta { color: var(--success); font-weight: 700; }
-  .pb-line .delta.bad { color: var(--text-dim); }
+
+  /* Charts */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 14px 0 6px;
+  }
+  .chart-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px 8px;
+  }
+  .chart-card .chart-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .chart-card .chart-label .latest {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .chart-card canvas {
+    display: block;
+    width: 100%;
+    height: 70px;
+  }
 
   .gameover-stats {
     display: grid;
@@ -982,12 +1049,23 @@
     <h2 id="over-title">Game Over</h2>
     <div class="result-headline" id="result-headline">0</div>
     <div class="result-sub" id="result-sub">Score</div>
-    <div id="pb-pill" class="pb-pill" style="display:none;">⭐ NEW BEST</div>
+    <div id="pb-pill" class="pb-pill" style="display:none;">★ NEW BEST</div>
+    <div class="pb-delta" id="pb-delta" style="display:none;"></div>
     <div class="pb-line" id="pb-line"></div>
     <div class="gameover-stats">
       <div class="stat"><span class="lbl">Accuracy</span><span class="val" id="go-acc">0%</span></div>
       <div class="stat"><span class="lbl">Hits</span><span class="val" id="go-hits">0/0</span></div>
       <div class="stat"><span class="lbl">Best Streak</span><span class="val" id="go-streak">0</span></div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-label"><span>Score · Last Runs</span><span class="latest" id="chart-score-latest"></span></div>
+        <canvas id="chart-score" width="280" height="70"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-label"><span>Accuracy · Last Runs</span><span class="latest" id="chart-acc-latest"></span></div>
+        <canvas id="chart-acc" width="280" height="70"></canvas>
+      </div>
     </div>
     <p id="over-time"></p>
     <p id="best-score"></p>
@@ -1054,6 +1132,23 @@ function deepMerge(target, src) {
   }
 }
 loadSettings();
+
+// ============================================================================
+// Run history (last N runs per mode-difficulty)
+// ============================================================================
+const HISTORY_PREFIX = 'runs_';
+const MAX_HISTORY = 20;
+function getRunHistory(key) {
+  try { return JSON.parse(localStorage.getItem(HISTORY_PREFIX + key) || '[]'); }
+  catch { return []; }
+}
+function pushRunHistory(key, run) {
+  const arr = getRunHistory(key);
+  arr.push(run);
+  while (arr.length > MAX_HISTORY) arr.shift();
+  localStorage.setItem(HISTORY_PREFIX + key, JSON.stringify(arr));
+  return arr;
+}
 
 // ============================================================================
 // Sensitivity — user-specified inches per 360° (any game), persisted to localStorage
@@ -2068,6 +2163,102 @@ function spawnDmgPopup(worldX, worldY, worldZ, text, kind) {
   setTimeout(() => div.remove(), 750);
 }
 
+function drawLineChart(canvas, values, color, opts = {}) {
+  const ctx = canvas.getContext('2d');
+  // High-DPI scale
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = canvas.clientWidth || canvas.width;
+  const cssH = canvas.clientHeight || canvas.height;
+  if (canvas.width !== cssW * dpr || canvas.height !== cssH * dpr) {
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = cssW, h = cssH;
+  ctx.clearRect(0, 0, w, h);
+  if (values.length === 0) return;
+
+  const padX = 6;
+  const padTop = 6;
+  const padBot = 6;
+  const usableW = w - padX * 2;
+  const usableH = h - padTop - padBot;
+
+  let max = opts.max ?? Math.max(...values);
+  let min = opts.min ?? Math.min(...values);
+  if (max === min) { max += 1; min -= 1; }
+  // pad range slightly
+  const pad = (max - min) * 0.15;
+  max += pad; min -= pad;
+  if (opts.fixedMin !== undefined) min = opts.fixedMin;
+  if (opts.fixedMax !== undefined) max = opts.fixedMax;
+  const range = max - min;
+
+  const xStep = values.length > 1 ? usableW / (values.length - 1) : 0;
+
+  // gridlines (4)
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const y = padTop + i * usableH / 3 + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(padX, y);
+    ctx.lineTo(w - padX, y);
+    ctx.stroke();
+  }
+
+  // path
+  ctx.beginPath();
+  for (let i = 0; i < values.length; i++) {
+    const x = padX + (values.length === 1 ? usableW / 2 : i * xStep);
+    const y = padTop + usableH - ((values[i] - min) / range) * usableH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  // fill underneath
+  const lastX = padX + (values.length === 1 ? usableW / 2 : (values.length - 1) * xStep);
+  ctx.lineTo(lastX, h - padBot);
+  ctx.lineTo(padX + (values.length === 1 ? usableW / 2 : 0), h - padBot);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, padTop, 0, h - padBot);
+  grad.addColorStop(0, color + '55');
+  grad.addColorStop(1, color + '00');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // line stroke
+  ctx.beginPath();
+  for (let i = 0; i < values.length; i++) {
+    const x = padX + (values.length === 1 ? usableW / 2 : i * xStep);
+    const y = padTop + usableH - ((values[i] - min) / range) * usableH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // points
+  for (let i = 0; i < values.length; i++) {
+    const x = padX + (values.length === 1 ? usableW / 2 : i * xStep);
+    const y = padTop + usableH - ((values[i] - min) / range) * usableH;
+    const isLast = i === values.length - 1;
+    ctx.beginPath();
+    ctx.fillStyle = isLast ? '#fff' : color;
+    ctx.arc(x, y, isLast ? 4 : 2, 0, Math.PI * 2);
+    ctx.fill();
+    if (isLast) {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+
 function showHsToast() {
   hsToast.textContent = 'HEADSHOT';
   hsToast.classList.add('show');
@@ -2507,8 +2698,12 @@ function gameOver(won) {
   $('go-hits').textContent = `${shotsHit}/${shotsFired}`;
   $('go-streak').textContent = bestStreak;
 
+  // PB detection + history
   let isPb = false;
   let pbLine = '';
+  let pbDelta = '';
+  let pbDeltaBad = false;
+  let history = [];
   if (bestKey) {
     const fullKey = bestKey + '-' + Settings.difficulty;
     const stored = localStorage.getItem('best_' + fullKey);
@@ -2517,25 +2712,75 @@ function gameOver(won) {
       isPb = true;
       localStorage.setItem('best_' + fullKey, bestVal);
       pbLine = 'First run on this difficulty';
+      pbDelta = 'New record';
     } else {
       const better = lower ? bestVal < prevBest : bestVal > prevBest;
       if (better) {
         isPb = true;
         const delta = lower ? (prevBest - bestVal) : (bestVal - prevBest);
-        const fmt = lower ? `${delta.toFixed(2)}s faster` : `+${delta} better`;
+        const pct = (delta / prevBest) * 100;
+        const fmt = lower
+          ? `${delta.toFixed(2)}s faster · +${pct.toFixed(1)}% better`
+          : `+${delta} · +${pct.toFixed(1)}% better`;
         localStorage.setItem('best_' + fullKey, bestVal);
-        pbLine = `Previous best: ${lower ? prevBest + 's' : prevBest}  ·  <span class="delta">${fmt}</span>`;
+        pbLine = `Previous best: ${lower ? prevBest.toFixed(2) + 's' : prevBest}`;
+        pbDelta = fmt;
       } else {
         const delta = lower ? (bestVal - prevBest) : (prevBest - bestVal);
-        const fmt = lower ? `${delta.toFixed(2)}s slower` : `-${delta} from best`;
-        pbLine = `Best: ${lower ? prevBest + 's' : prevBest}  ·  <span class="delta bad">${fmt}</span>`;
+        const pct = (delta / prevBest) * 100;
+        pbLine = `Best: ${lower ? prevBest.toFixed(2) + 's' : prevBest}`;
+        pbDelta = lower
+          ? `${delta.toFixed(2)}s slower · -${pct.toFixed(1)}%`
+          : `-${delta} from best · -${pct.toFixed(1)}%`;
+        pbDeltaBad = true;
       }
     }
+    // Persist this run to history (separate from PB)
+    history = pushRunHistory(fullKey, {
+      score: lower ? parseFloat(elapsed) : score,
+      acc,
+      ts: Date.now()
+    });
   }
+
   $('pb-pill').style.display = isPb ? 'inline-block' : 'none';
+  const headlineEl = $('result-headline');
+  headlineEl.classList.toggle('pb', isPb);
+  // Force-restart animation
+  if (isPb) { headlineEl.style.animation = 'none'; void headlineEl.offsetWidth; headlineEl.style.animation = ''; }
+
+  const pbDeltaEl = $('pb-delta');
+  if (pbDelta) {
+    pbDeltaEl.textContent = pbDelta;
+    pbDeltaEl.classList.toggle('bad', pbDeltaBad);
+    pbDeltaEl.style.display = 'block';
+  } else {
+    pbDeltaEl.style.display = 'none';
+  }
+
   $('pb-line').innerHTML = pbLine;
   bestScoreEl.textContent = '';
   overTime.textContent = '';
+
+  // Charts
+  const scoreCanvas = $('chart-score');
+  const accCanvas = $('chart-acc');
+  if (history.length > 0) {
+    const scoreVals = history.map(r => r.score);
+    const accVals = history.map(r => r.acc);
+    // For lower-is-better (time), invert color meaning but still show line — use accent color always
+    const scoreColor = lower ? '#06b6d4' : '#06b6d4';
+    drawLineChart(scoreCanvas, scoreVals, scoreColor);
+    drawLineChart(accCanvas, accVals, '#10b981', { fixedMin: 0, fixedMax: 100 });
+    const lastScore = scoreVals[scoreVals.length - 1];
+    $('chart-score-latest').textContent = lower ? lastScore.toFixed(2) + 's' : lastScore;
+    $('chart-acc-latest').textContent = (accVals[accVals.length - 1] || 0) + '%';
+  } else {
+    scoreCanvas.getContext('2d').clearRect(0, 0, scoreCanvas.width, scoreCanvas.height);
+    accCanvas.getContext('2d').clearRect(0, 0, accCanvas.width, accCanvas.height);
+    $('chart-score-latest').textContent = '';
+    $('chart-acc-latest').textContent = '';
+  }
 
   showOnly(overlayScreen);
 }
