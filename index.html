@@ -230,6 +230,22 @@
   #streak .value { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
   #streak.hot .value { color: var(--gold); text-shadow: 0 0 20px rgba(251,191,36,0.5); }
 
+  /* App version tag (top-left above FPS) */
+  #app-version {
+    position: fixed;
+    top: calc(var(--hud-inset) - 1px);
+    left: calc(var(--hud-inset) + 80px);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.3);
+    pointer-events: none;
+    z-index: 6;
+    letter-spacing: 0.5px;
+    font-variant-numeric: tabular-nums;
+    padding: 8px 0;
+  }
+  #app-version.hide { display: none; }
+
   /* FPS counter */
   #fps-counter {
     position: fixed; top: var(--hud-inset); left: var(--hud-inset);
@@ -737,9 +753,11 @@
     font-size: 1rem;
     font-weight: 700;
     text-align: left;
+    text-decoration: none;
     transition: all var(--t-fast);
     position: relative;
     overflow: hidden;
+    display: inline-block;
   }
   .btn:hover {
     background: var(--surface-2);
@@ -1887,6 +1905,7 @@
 </div>
 
 <div id="fps-counter">— FPS</div>
+<div id="app-version"></div>
 <div id="augment-banner">
   <div class="aug-title">AUGMENTED: <span id="aug-name">—</span></div>
   <div class="aug-body" id="aug-body">—</div>
@@ -1989,6 +2008,8 @@
 
   <div class="row" style="margin-top:18px;">
     <button class="btn muted" id="btn-settings">⚙ Settings</button>
+    <a class="btn muted" href="https://github.com/1504681/BrowserAimTrainer/issues/new?labels=bug&title=Bug%3A+&body=%23%23+What+happened%0A%0A%23%23+Expected%0A%0A%23%23+Steps+to+reproduce%0A" target="_blank" rel="noopener">🐛 Report Bug</a>
+    <a class="btn muted" href="https://github.com/1504681/BrowserAimTrainer/issues/new?labels=enhancement&title=Feature+Request%3A+&body=%23%23+What+would+you+like%0A%0A%23%23+Why+%2F+use+case%0A" target="_blank" rel="noopener">💡 Feature Request</a>
   </div>
 </div>
 
@@ -2122,6 +2143,7 @@
         <div class="field"><label>Head color</label><input type="color" id="set-head-color"></div>
         <div class="field"><label>FOV (vertical)</label><input type="range" id="set-fov" min="40" max="110" step="1"><span class="value" id="set-fov-v"></span></div>
         <div class="field"><label>HUD distance from edge</label><input type="range" id="set-hud-inset" min="0" max="120" step="2"><span class="value" id="set-hud-inset-v"></span></div>
+        <div class="field"><label>Show version tag</label><input type="checkbox" id="set-show-version"></div>
       </div>
 
       <div class="section" data-section="gameplay">
@@ -2264,6 +2286,12 @@
     <h1 id="sd-title">Scenario</h1>
     <p id="sd-desc" class="sd-description"></p>
 
+    <div class="difficulty-toggle" id="sd-difficulty">
+      <button class="diff-btn diff-easy" data-sd-diff="easy">Easy</button>
+      <button class="diff-btn diff-normal" data-sd-diff="normal">Normal</button>
+      <button class="diff-btn diff-hard" data-sd-diff="hard">Hard</button>
+    </div>
+
     <div class="sd-bests-title">Best Scores</div>
     <div class="sd-bests" id="sd-bests"></div>
 
@@ -2299,10 +2327,11 @@
           <input type="range" id="sd-cust-dist" min="0.4" max="2.5" step="0.1">
           <span class="value" id="sd-cust-dist-v">×1.00</span>
         </div>
-        <div class="field"><label>Use custom settings</label>
-          <input type="checkbox" id="sd-cust-enable">
+        <div class="row" style="margin-top:12px; gap:6px;">
+          <button class="btn primary" id="sd-cust-play-click">▶ Play Custom Click</button>
+          <button class="btn success" id="sd-cust-play-track">▶ Play Custom Track</button>
+          <button class="btn muted" id="sd-cust-reset">Reset</button>
         </div>
-        <button class="btn muted" id="sd-cust-reset" style="margin-top:6px;">Reset to defaults</button>
       </div>
     </details>
 
@@ -2395,6 +2424,11 @@
 import * as THREE from 'three';
 
 // ============================================================================
+// App version — bumped whenever shipping a notable change
+// ============================================================================
+const APP_VERSION = 'v0.9.0';
+
+// ============================================================================
 // Settings (persisted to localStorage)
 // ============================================================================
 const SETTINGS_KEY = 'aimtrain_settings_v1';
@@ -2422,6 +2456,7 @@ const DEFAULT_SETTINGS = {
   submitScores: true,
   augment: null,  // 'smoothness' | 'speed' | null
   strafeTutorialSeen: false,
+  showVersion: true,
   // Per-scenario custom multipliers (size, speed, dirChange, hp) + enabled flag
   customScenarios: {
     bouncing: { size: 1, speed: 1, dir: 1, hp: 1, distance: 1, enabled: false },
@@ -5295,6 +5330,7 @@ syncFns.push(bindColor ('set-target-color', () => Settings.targetColor, v => Set
 syncFns.push(bindColor ('set-head-color',   () => Settings.headColor,   v => Settings.headColor = v));
 syncFns.push(bindRange ('set-fov', 'set-fov-v', () => Settings.fov, v => Settings.fov = v));
 syncFns.push(bindRange ('set-hud-inset', 'set-hud-inset-v', () => Settings.hudInset, v => Settings.hudInset = v));
+syncFns.push(bindCheckbox('set-show-version', () => Settings.showVersion, v => Settings.showVersion = v));
 
 syncFns.push(bindCheckbox('set-submit-scores', () => Settings.submitScores, v => Settings.submitScores = v));
 
@@ -5321,6 +5357,7 @@ function onSettingsChanged() {
   camera.fov = augActive ? augActive.fov : Settings.fov;
   camera.updateProjectionMatrix();
   document.documentElement.style.setProperty('--hud-inset', Settings.hudInset + 'px');
+  $('app-version').classList.toggle('hide', !Settings.showVersion);
   syncCrosshairFields();
   renderCrosshair();
   refreshEnemyColors();
@@ -5430,10 +5467,13 @@ async function openScenarioDetail(modeKey) {
   $('sd-cust-hp-v').textContent = '×' + Number(cfg.hp || 1).toFixed(2);
   $('sd-cust-dist').value = cfg.distance || 1;
   $('sd-cust-dist-v').textContent = '×' + Number(cfg.distance || 1).toFixed(2);
-  $('sd-cust-enable').checked = !!cfg.enabled;
-  if (cfg.enabled) $('sd-customize').setAttribute('open', '');
 
   renderScenarioBests(modeKey);
+
+  // Sync detail-screen difficulty buttons
+  for (const b of document.querySelectorAll('[data-sd-diff]')) {
+    b.classList.toggle('active', b.dataset.sdDiff === Settings.difficulty);
+  }
 
   // Chart of the current (difficulty, weapon) selection
   const currentKey = modeKey + '-' + Settings.difficulty + '-' + Settings.weapon;
@@ -5454,20 +5494,40 @@ async function openScenarioDetail(modeKey) {
 
 $('sd-back').onclick = () => showOnly(menuScreen);
 
-function startFromDetail(weapon) {
+// Detail-screen difficulty buttons — change difficulty + re-render
+for (const b of document.querySelectorAll('[data-sd-diff]')) {
+  b.addEventListener('click', () => {
+    Settings.difficulty = b.dataset.sdDiff;
+    saveSettings();
+    syncDifficultyButtons();
+    if (sdMode) openScenarioDetail(sdMode);
+  });
+}
+
+function startFromDetail(weapon, useCustom = false) {
   if (!sdMode) return;
-  const cfg = Settings.customScenarios[sdMode];
-  if (cfg && cfg.enabled) {
+  if (useCustom) {
+    const cfg = Settings.customScenarios[sdMode];
+    // Snapshot the current slider values
+    cfg.size = parseFloat($('sd-cust-size').value);
+    cfg.speed = parseFloat($('sd-cust-speed').value);
+    cfg.dir = parseFloat($('sd-cust-dir').value);
+    cfg.hp = parseFloat($('sd-cust-hp').value);
+    cfg.distance = parseFloat($('sd-cust-dist').value);
+    cfg.enabled = true;
+    saveSettings();
     activeCustomMode = true;
-    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir, hp: cfg.hp || 1, distance: cfg.distance || 1 };
+    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir, hp: cfg.hp, distance: cfg.distance };
   } else {
     activeCustomMode = false;
     activeCustomCfg = null;
   }
   startGame(sdMode, weapon);
 }
-$('sd-play-click').onclick = () => startFromDetail('hitscan');
-$('sd-play-track').onclick = () => startFromDetail('tracking');
+$('sd-play-click').onclick = () => startFromDetail('hitscan', false);
+$('sd-play-track').onclick = () => startFromDetail('tracking', false);
+$('sd-cust-play-click').onclick = () => startFromDetail('hitscan', true);
+$('sd-cust-play-track').onclick = () => startFromDetail('tracking', true);
 
 // Wire customize controls
 function bindCustomSlider(id, vId, key) {
@@ -5827,6 +5887,9 @@ applySkybox();
 renderCrosshair();
 syncSettingsUI();
 syncCrosshairFields();
+// Version tag
+$('app-version').textContent = APP_VERSION;
+$('app-version').classList.toggle('hide', !Settings.showVersion);
 // Apply initial FOV — consider persisted augment
 {
   const augActive = Settings.augment && AUGMENTS[Settings.augment];
