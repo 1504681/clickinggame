@@ -1123,6 +1123,36 @@
   .scenario-card { cursor: pointer; }
   .scenario-card .scenario-buttons { cursor: default; }
 
+  /* Scenario customize section */
+  .sd-customize {
+    margin-top: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 4px 14px;
+  }
+  .sd-customize summary {
+    cursor: pointer;
+    padding: 10px 0;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    list-style: none;
+  }
+  .sd-customize summary::-webkit-details-marker { display: none; }
+  .sd-customize[open] summary { color: var(--accent); }
+  .sd-customize-body {
+    padding: 6px 0 14px;
+    border-top: 1px solid var(--border);
+  }
+  .sd-cust-hint {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin: 8px 0 12px;
+  }
+
   /* Run history detail screen */
   #history-screen .container {
     max-width: 760px;
@@ -1574,6 +1604,29 @@
       <canvas id="sd-chart" width="640" height="120"></canvas>
     </div>
 
+    <details class="sd-customize" id="sd-customize">
+      <summary>⚙ Customize</summary>
+      <div class="sd-customize-body">
+        <p class="sd-cust-hint">Custom runs save to a separate highscore table (per mode + weapon).</p>
+        <div class="field"><label>Target size</label>
+          <input type="range" id="sd-cust-size" min="0.4" max="2.0" step="0.05">
+          <span class="value" id="sd-cust-size-v">×1.00</span>
+        </div>
+        <div class="field"><label>Target speed</label>
+          <input type="range" id="sd-cust-speed" min="0.4" max="2.5" step="0.05">
+          <span class="value" id="sd-cust-speed-v">×1.00</span>
+        </div>
+        <div class="field"><label>Direction-change rate</label>
+          <input type="range" id="sd-cust-dir" min="0.4" max="2.5" step="0.05">
+          <span class="value" id="sd-cust-dir-v">×1.00</span>
+        </div>
+        <div class="field"><label>Use custom settings</label>
+          <input type="checkbox" id="sd-cust-enable">
+        </div>
+        <button class="btn muted" id="sd-cust-reset" style="margin-top:6px;">Reset to defaults</button>
+      </div>
+    </details>
+
     <div class="row" style="margin-top: 18px;">
       <button class="btn primary" id="sd-play-click">▶ Play Click</button>
       <button class="btn success" id="sd-play-track">▶ Play Track</button>
@@ -1675,7 +1728,14 @@ const DEFAULT_SETTINGS = {
   walkSpeed: 5.5,
   trackingCount: 4,
   weapon: 'hitscan',
-  hudInset: 16
+  hudInset: 16,
+  // Per-scenario custom multipliers (size, speed, dirChange) + enabled flag
+  customScenarios: {
+    bouncing: { size: 1, speed: 1, dir: 1, enabled: false },
+    cylinder: { size: 1, speed: 1, dir: 1, enabled: false },
+    dodge:    { size: 1, speed: 1, dir: 1, enabled: false },
+    pole:     { size: 1, speed: 1, dir: 1, enabled: false }
+  }
 };
 
 const WEAPONS = {
@@ -2626,7 +2686,22 @@ const DIFFICULTY = {
   normal: { speedMul: 1.2,  headScale: 1.0, dirChangeMs: 1800, targetScale: 1.00 },
   hard:   { speedMul: 1.8,  headScale: 0.7, dirChangeMs: 1200, targetScale: 0.72 }
 };
-function currentDifficulty() { return DIFFICULTY[Settings.difficulty] || DIFFICULTY.normal; }
+function currentDifficulty() {
+  // If the active scenario is in custom mode, return a synthesized difficulty profile
+  if (activeCustomMode && activeCustomCfg) {
+    const base = DIFFICULTY.normal;
+    return {
+      speedMul:    activeCustomCfg.speed,
+      headScale:   base.headScale,
+      dirChangeMs: base.dirChangeMs / Math.max(0.1, activeCustomCfg.dir),
+      targetScale: activeCustomCfg.size
+    };
+  }
+  return DIFFICULTY[Settings.difficulty] || DIFFICULTY.normal;
+}
+
+let activeCustomMode = false;
+let activeCustomCfg = null;
 
 function pickPursuerDuration() {
   // Difficulty-driven: easy = long strafes (easier), hard = short strafes (harder)
@@ -3505,6 +3580,8 @@ function showMainMenu() {
   gameActive = false;
   gamePaused = false;
   weaponLocked = false;
+  activeCustomMode = false;
+  activeCustomCfg = null;
   mode = '';
   stopTimer();
   if (document.exitPointerLock) document.exitPointerLock();
@@ -3808,13 +3885,14 @@ function gameOver(won) {
   let pbDeltaBad = false;
   let history = [];
   if (bestKey) {
-    // Append weapon so click/track have separate tables per scenario+difficulty
-    const fullKey = bestKey + '-' + Settings.difficulty + '-' + Settings.weapon;
+    // Custom runs go into their own per-mode+weapon table
+    const diffPart = activeCustomMode ? 'custom' : Settings.difficulty;
+    const fullKey = bestKey + '-' + diffPart + '-' + Settings.weapon;
     lastHistoryKey = fullKey;
     // Scoreboard label so player knows which highscore table this run is on
     const sbLabel = $('scoreboard-label');
     const niceMode  = bestKey.charAt(0).toUpperCase() + bestKey.slice(1);
-    const niceDiff  = Settings.difficulty.charAt(0).toUpperCase() + Settings.difficulty.slice(1);
+    const niceDiff  = activeCustomMode ? 'Custom' : (Settings.difficulty.charAt(0).toUpperCase() + Settings.difficulty.slice(1));
     const niceWeapon = Settings.weapon === 'tracking' ? 'Track' : 'Click';
     sbLabel.textContent = `${niceMode} · ${niceDiff} · ${niceWeapon}`;
     sbLabel.style.display = 'inline-block';
@@ -4089,6 +4167,17 @@ function openScenarioDetail(modeKey) {
   $('sd-title').textContent = info.title;
   $('sd-desc').textContent = info.description;
 
+  // Sync customize UI from saved per-scenario settings
+  const cfg = Settings.customScenarios[modeKey] || { size: 1, speed: 1, dir: 1, enabled: false };
+  $('sd-cust-size').value = cfg.size;
+  $('sd-cust-size-v').textContent = '×' + Number(cfg.size).toFixed(2);
+  $('sd-cust-speed').value = cfg.speed;
+  $('sd-cust-speed-v').textContent = '×' + Number(cfg.speed).toFixed(2);
+  $('sd-cust-dir').value = cfg.dir;
+  $('sd-cust-dir-v').textContent = '×' + Number(cfg.dir).toFixed(2);
+  $('sd-cust-enable').checked = !!cfg.enabled;
+  if (cfg.enabled) $('sd-customize').setAttribute('open', '');
+
   // Populate the bests grid (3 difficulties × 2 weapons)
   const bestsEl = $('sd-bests');
   bestsEl.innerHTML = '';
@@ -4124,8 +4213,52 @@ function openScenarioDetail(modeKey) {
 }
 
 $('sd-back').onclick = () => showOnly(menuScreen);
-$('sd-play-click').onclick = () => { if (sdMode) startGame(sdMode, 'hitscan'); };
-$('sd-play-track').onclick = () => { if (sdMode) startGame(sdMode, 'tracking'); };
+
+function startFromDetail(weapon) {
+  if (!sdMode) return;
+  const cfg = Settings.customScenarios[sdMode];
+  if (cfg && cfg.enabled) {
+    activeCustomMode = true;
+    activeCustomCfg = { size: cfg.size, speed: cfg.speed, dir: cfg.dir };
+  } else {
+    activeCustomMode = false;
+    activeCustomCfg = null;
+  }
+  startGame(sdMode, weapon);
+}
+$('sd-play-click').onclick = () => startFromDetail('hitscan');
+$('sd-play-track').onclick = () => startFromDetail('tracking');
+
+// Wire customize controls
+function bindCustomSlider(id, vId, key) {
+  const el = $(id);
+  const lbl = $(vId);
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    lbl.textContent = '×' + v.toFixed(2);
+    if (sdMode) {
+      Settings.customScenarios[sdMode][key] = v;
+      saveSettings();
+    }
+  });
+}
+bindCustomSlider('sd-cust-size', 'sd-cust-size-v', 'size');
+bindCustomSlider('sd-cust-speed', 'sd-cust-speed-v', 'speed');
+bindCustomSlider('sd-cust-dir', 'sd-cust-dir-v', 'dir');
+
+$('sd-cust-enable').addEventListener('change', () => {
+  if (sdMode) {
+    Settings.customScenarios[sdMode].enabled = $('sd-cust-enable').checked;
+    saveSettings();
+  }
+});
+
+$('sd-cust-reset').onclick = () => {
+  if (!sdMode) return;
+  Settings.customScenarios[sdMode] = { size: 1, speed: 1, dir: 1, enabled: false };
+  saveSettings();
+  openScenarioDetail(sdMode); // re-render
+};
 
 // ============================================================================
 // Wire menu — scenario cards + difficulty toggle
@@ -4135,6 +4268,9 @@ for (const btn of document.querySelectorAll('.play-btn')) {
     e.stopPropagation(); // don't bubble to the card click handler
     const m = btn.dataset.mode;
     const w = btn.dataset.weapon;
+    // Inline play buttons always use the standard difficulty (not custom)
+    activeCustomMode = false;
+    activeCustomCfg = null;
     startGame(m, w);
   });
 }
