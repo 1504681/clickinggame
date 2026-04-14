@@ -80,6 +80,68 @@
   }
   #hs-toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
+  /* HP bar (cylinder/pursuer mode) */
+  #hp-bar {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    height: 16px;
+    background: rgba(0,0,0,0.65);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 9px;
+    z-index: 4;
+    display: none;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  }
+  #hp-bar.show { display: block; }
+  #hp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2ecc71 0%, #f1c40f 60%, #e74c3c 100%);
+    width: 100%;
+    transition: width 0.08s linear;
+  }
+
+  /* Weapon HUD */
+  #weapon-hud {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    gap: 8px;
+    z-index: 4;
+    font-size: 0.85rem;
+  }
+  #weapon-hud.show { display: flex; }
+  .weapon-slot {
+    background: rgba(0,0,0,0.55);
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.55);
+  }
+  .weapon-slot b {
+    display: inline-block;
+    width: 18px; height: 18px;
+    line-height: 18px;
+    text-align: center;
+    background: rgba(255,255,255,0.15);
+    border-radius: 4px;
+    margin-right: 6px;
+    font-size: 0.75rem;
+  }
+  .weapon-slot.active {
+    color: #fff;
+    border-color: #e94560;
+    background: rgba(233,69,96,0.18);
+  }
+  .weapon-slot.active b {
+    background: #e94560;
+  }
+
   /* Dodge bar */
   #dodge-bar {
     position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
@@ -126,11 +188,39 @@
   }
 
   .menu-section { margin-bottom: 12px; text-align: center; }
+  .menu-controls {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .menu-controls label { font-size: 0.85rem; opacity: 0.8; }
+  .menu-controls select {
+    margin-left: 4px;
+    padding: 4px 8px;
+    background: #111;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 4px;
+    font-size: 0.85rem;
+  }
+  .section-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    opacity: 0.5;
+    margin: 14px 0 6px;
+    text-align: center;
+  }
   .menu-grid {
     display: grid;
-    grid-template-columns: repeat(2, 240px);
+    grid-template-columns: repeat(2, 260px);
     gap: 10px;
-    margin-bottom: 10px;
+    margin-bottom: 4px;
+  }
+  @media (max-width: 580px) {
+    .menu-grid { grid-template-columns: 1fr; }
   }
 
   .btn {
@@ -343,10 +433,18 @@
 <div id="hs-toast"></div>
 <div id="dodge-bar"><span id="dodge-arrow">— STRAFE —</span><small>multiplier active when moving in direction</small></div>
 
+<div id="hp-bar"><div id="hp-fill"></div></div>
+
+<div id="weapon-hud">
+  <span class="weapon-slot" data-w="hitscan"><b>1</b> Click Timing</span>
+  <span class="weapon-slot" data-w="tracking"><b>2</b> Tracking</span>
+</div>
+
 <!-- ===== Main Menu ===== -->
 <div id="menu" class="screen show">
   <h1>Browser Aim Trainer<span class="badge">3D · FPS</span></h1>
-  <div class="sens">F fullscreen · ESC pause · R restart</div>
+  <div class="sens">F Fullscreen · ESC Pause · R Restart · 1/2 Switch Weapon</div>
+
   <div class="cal">
     <div class="row">
       <label>in / 360°: <input id="cal-input" type="number" step="0.01" value="15.4083"></label>
@@ -356,34 +454,38 @@
     <div class="cal-hint">Browser pointer lock loses raw counts to OS pointer settings — calibrate or tweak the value above.</div>
   </div>
 
-  <div class="menu-section">
-    <div class="row" style="margin-bottom:6px;">
-      <label>Difficulty:
-        <select id="difficulty-select">
-          <option value="easy">Easy</option>
-          <option value="normal" selected>Normal</option>
-          <option value="hard">Hard</option>
-        </select>
-      </label>
-    </div>
+  <div class="menu-controls">
+    <label>Difficulty:
+      <select id="difficulty-select">
+        <option value="easy">Easy</option>
+        <option value="normal" selected>Normal</option>
+        <option value="hard">Hard</option>
+      </select>
+    </label>
+    <label>Weapon:
+      <select id="menu-weapon-select">
+        <option value="hitscan">Click Timing</option>
+        <option value="tracking">Tracking</option>
+      </select>
+    </label>
   </div>
 
-  <h2>Static</h2>
+  <div class="section-label">Click Timing</div>
   <div class="menu-grid">
-    <button class="btn primary" id="btn-classic">Classic<span class="desc">Hit 50 white targets — fastest time wins</span></button>
-    <button class="btn warn" id="btn-endurance">Endurance<span class="desc">Survive 60s — don't shoot wrong tile</span></button>
-    <button class="btn muted" id="btn-zen">Zen<span class="desc">No timer — just shoot</span></button>
-    <button class="btn success" id="btn-flicks">Flicks<span class="desc">One target at a time, random spots</span></button>
+    <button class="btn primary" id="btn-classic">Classic<span class="desc">Hit 50 targets · fastest time wins</span></button>
+    <button class="btn warn" id="btn-endurance">Endurance<span class="desc">Survive 60s · don't miss</span></button>
+    <button class="btn muted" id="btn-zen">Zen<span class="desc">No timer · just shoot</span></button>
+    <button class="btn success" id="btn-flicks">Flicks<span class="desc">One target at random spots</span></button>
   </div>
 
-  <h2>Tracking & Movement</h2>
+  <div class="section-label">Tracking & Movement</div>
   <div class="menu-grid">
-    <button class="btn success" id="btn-tracking">Tracking<span class="desc">Moving targets · headshots count double</span></button>
-    <button class="btn danger" id="btn-dodge">Dodge<span class="desc">Strafe with the bar to maximize score</span></button>
-    <button class="btn success" id="btn-cylinder">Pursuer<span class="desc">Cylinder bots that orbit and strafe around you</span></button>
+    <button class="btn success" id="btn-tracking">Tracking<span class="desc">Bouncing targets · headshots ×2</span></button>
+    <button class="btn success" id="btn-cylinder">Pursuer<span class="desc">One bot kites you · health bar</span></button>
+    <button class="btn danger" id="btn-dodge">Dodge<span class="desc">WASD · strafe with the bar for ×2</span></button>
   </div>
 
-  <div class="row" style="margin-top:14px;">
+  <div class="row" style="margin-top:18px;">
     <button class="btn muted" id="btn-settings">⚙ Settings</button>
   </div>
 </div>
@@ -523,7 +625,7 @@
 </div>
 
 <!-- Game over overlay -->
-<div id="overlay">
+<div id="overlay" class="screen">
   <h2 id="over-title">Game Over</h2>
   <p id="over-score"></p>
   <p id="over-time"></p>
@@ -685,6 +787,21 @@ function playMiss() {
   o.start(t); o.stop(t + 0.13);
 }
 
+// Light tick sounds for tracking weapon (very short, low volume)
+function playTrackingTick(hit) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = hit ? 'square' : 'sine';
+  o.frequency.setValueAtTime(hit ? 1400 : 220, t);
+  if (hit) o.frequency.exponentialRampToValueAtTime(900, t + 0.02);
+  g.gain.setValueAtTime((hit ? 0.05 : 0.03) * vol(), t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t); o.stop(t + 0.03);
+}
+
 // ============================================================================
 // Game state
 // ============================================================================
@@ -738,6 +855,9 @@ const fsButton = $('btn-fullscreen');
 const hsToast = $('hs-toast');
 const dodgeBar = $('dodge-bar');
 const dodgeArrow = $('dodge-arrow');
+const hpBar = $('hp-bar');
+const hpFill = $('hp-fill');
+const weaponHud = $('weapon-hud');
 const scoreDisplay = $('score-display');
 const timerDisplay = $('timer-display');
 const accDisplay = $('acc-display');
@@ -1004,8 +1124,13 @@ function refreshEnemyColors() {
 // ============================================================================
 // Cylinder targets (kiting AI for "Pursuer" mode)
 // ============================================================================
-const cylBodyGeo = new THREE.CylinderGeometry(0.45, 0.45, 1.6, 16);
-const cylHeadGeo = new THREE.SphereGeometry(0.32, 16, 12);
+const CYL_BODY_RADIUS = 0.32;
+const CYL_BODY_HEIGHT = 1.6;
+const CYL_HEAD_RADIUS = 0.30;
+const CYLINDER_HP = 4;
+
+const cylBodyGeo = new THREE.CylinderGeometry(CYL_BODY_RADIUS, CYL_BODY_RADIUS, CYL_BODY_HEIGHT, 18);
+const cylHeadGeo = new THREE.SphereGeometry(CYL_HEAD_RADIUS, 18, 14);
 
 function makeCylinder() {
   const group = new THREE.Group();
@@ -1025,14 +1150,16 @@ function makeCylinder() {
     emissiveIntensity: 1.0, metalness: 0.1, roughness: 0.5
   });
   const head = new THREE.Mesh(cylHeadGeo, headMat);
-  head.position.y = 1.6 / 2 + 0.32 + 0.04;
+  // Connect head to body — overlap slightly so there's no visible gap
+  head.position.y = CYL_BODY_HEIGHT / 2 + CYL_HEAD_RADIUS - 0.08;
   head.castShadow = true;
   head.userData.part = 'head';
   group.add(head);
 
   const e = {
     group, body, head, bodyMat, headMat,
-    vx: 0, vz: 0, hp: 2,
+    vx: 0, vz: 0,
+    hp: CYLINDER_HP, hpMax: CYLINDER_HP,
     strafeDir: Math.random() < 0.5 ? -1 : 1,
     strafeTimer: 0.5 + Math.random() * 1.5,
     flashUntil: 0,
@@ -1049,14 +1176,14 @@ function placeCylinder(e) {
   const r = 9 + Math.random() * 3;
   e.group.position.set(
     camera.position.x + Math.sin(angle) * r,
-    1.0,
+    CYL_BODY_HEIGHT / 2,
     camera.position.z - Math.cos(angle) * r
   );
   // Clamp to room
   const lim = ROOM_HALF - 1;
   e.group.position.x = Math.max(-lim, Math.min(lim, e.group.position.x));
   e.group.position.z = Math.max(-lim, Math.min(lim, e.group.position.z));
-  e.hp = 2;
+  e.hp = e.hpMax;
   e.strafeDir = Math.random() < 0.5 ? -1 : 1;
   e.strafeTimer = 0.6 + Math.random() * 1.4;
   e.vx = 0; e.vz = 0;
@@ -1287,12 +1414,40 @@ document.addEventListener('keydown', (e) => {
 
   if (e.code === 'KeyF') { e.preventDefault(); toggleFullscreen(); }
   else if (e.code === 'KeyR' && mode) { e.preventDefault(); startGame(mode); }
+  else if (e.code === 'Digit1') { e.preventDefault(); setWeapon('hitscan'); }
+  else if (e.code === 'Digit2') { e.preventDefault(); setWeapon('tracking'); }
   else if (e.code === 'Escape' && gameActive) {
     if (gamePaused) { quitToMenu(); }
     else { pauseGame(); }
   }
 });
 document.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+// ============================================================================
+// Weapon HUD + switching
+// ============================================================================
+function syncWeaponHud() {
+  for (const slot of weaponHud.querySelectorAll('.weapon-slot')) {
+    slot.classList.toggle('active', slot.dataset.w === Settings.weapon);
+  }
+}
+function setWeapon(name) {
+  if (!WEAPONS[name]) return;
+  Settings.weapon = name;
+  saveSettings();
+  syncWeaponHud();
+  // Also sync UI selects so they stay consistent
+  const sel1 = $('set-weapon');
+  if (sel1) sel1.value = name;
+  const sel2 = $('menu-weapon-select');
+  if (sel2) sel2.value = name;
+}
+for (const slot of weaponHud.querySelectorAll('.weapon-slot')) {
+  slot.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    setWeapon(slot.dataset.w);
+  });
+}
 
 // ============================================================================
 // Movement (snappy FPS-feel: high accel, quick stop)
@@ -1371,6 +1526,7 @@ function shoot() {
   camera.getWorldDirection(forward);
   raycaster.set(camera.position, forward);
 
+  const w = currentWeapon();
   if (mode === 'tracking' || mode === 'dodge' || mode === 'cylinder') {
     const parts = [];
     for (const e of enemies) parts.push(e.body, e.head);
@@ -1380,16 +1536,17 @@ function shoot() {
       const enemy = enemies.find(en => en.body === hitObj || en.head === hitObj);
       if (enemy) handleEnemyHit(enemy, hitObj.userData.part);
     } else {
-      playMiss();
+      if (w.auto) playTrackingTick(false);
+      else playMiss();
     }
   } else if (mode === 'flicks') {
     const hits = raycaster.intersectObjects(tileMeshes, false);
     if (hits.length > 0) handleFlickHit(hits[0].object.userData.index);
-    else playMiss();
+    else { if (w.auto) playTrackingTick(false); else playMiss(); }
   } else {
     const hits = raycaster.intersectObjects(tileMeshes, false);
     if (hits.length > 0) handleTap(hits[0].object.userData.index);
-    else playMiss();
+    else { if (w.auto) playTrackingTick(false); else playMiss(); }
   }
   updateAccuracy();
 }
@@ -1426,7 +1583,9 @@ function handleEnemyHit(enemy, part) {
     if (mode === 'tracking') placeEnemyOnPanel(enemy);
     else if (mode === 'dodge') placeEnemyAroundPlayer(enemy);
     else if (mode === 'cylinder') placeCylinder(enemy);
-  } else if (!w.auto) {
+  } else if (w.auto) {
+    playTrackingTick(true);
+  } else {
     HitSounds[Settings.hitsound]?.(0.7);
   }
 }
@@ -1547,6 +1706,13 @@ function animate(now) {
     }
   }
 
+  // HP bar (cylinder mode)
+  if (mode === 'cylinder' && enemies.length > 0) {
+    const e = enemies[0];
+    const pct = Math.max(0, Math.min(1, e.hp / e.hpMax));
+    hpFill.style.width = (pct * 100) + '%';
+  }
+
   // Auto-fire weapon (tracking) — keep firing while mouse held + locked + active
   const w = currentWeapon();
   if (w.auto && mouseDown && pointerLocked && gameActive && !gamePaused) {
@@ -1615,7 +1781,10 @@ function showMainMenu() {
   hud.classList.add('hide');
   crosshair.classList.remove('show');
   dodgeBar.classList.remove('show');
+  hpBar.classList.remove('show');
+  weaponHud.classList.remove('show');
   dodgeRoom.visible = false;
+  backWall.visible = true;
   for (const t of tileMeshes) t.visible = true;
   clearEnemies();
   gameActive = false;
@@ -1649,9 +1818,12 @@ function startGame(m) {
   // Configure scene per mode
   dodgeRoom.visible = false;
   dodgeBar.classList.remove('show');
+  hpBar.classList.remove('show');
+  weaponHud.classList.add('show');
   backWall.visible = true;
   for (const t of tileMeshes) t.visible = true;
   camera.position.set(0, 1.6, 0);
+  syncWeaponHud();
 
   // Default: aim camera at panel
   pitch = Math.atan((PANEL_Y - camera.position.y) / -PANEL_Z);
@@ -1694,13 +1866,11 @@ function startGame(m) {
     backWall.visible = false;
     dodgeRoom.visible = true;
     pitch = 0;
-    const targetCount = 2;
-    for (let i = 0; i < targetCount; i++) {
-      const e = makeCylinder();
-      placeCylinder(e);
-    }
+    const e = makeCylinder();
+    placeCylinder(e);
     timerDuration = CYLINDER_DURATION;
     timerDisplay.style.display = 'inline';
+    hpBar.classList.add('show');
   }
 
   if (timerDuration > 0 || mode === 'classic') {
@@ -1741,6 +1911,8 @@ function gameOver(won) {
   crosshair.classList.remove('show');
   hud.classList.add('hide');
   dodgeBar.classList.remove('show');
+  hpBar.classList.remove('show');
+  weaponHud.classList.remove('show');
 
   const elapsed = elapsedSeconds().toFixed(2);
   const acc = shotsFired === 0 ? 0 : Math.round((shotsHit / shotsFired) * 100);
@@ -1979,6 +2151,9 @@ $('difficulty-select').onchange = (e) => {
   saveSettings();
 };
 $('difficulty-select').value = Settings.difficulty;
+
+$('menu-weapon-select').onchange = (e) => setWeapon(e.target.value);
+$('menu-weapon-select').value = Settings.weapon;
 
 // Pause menu buttons
 $('pause-resume').onclick    = resumeGame;
