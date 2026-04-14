@@ -1913,6 +1913,8 @@
         </div>
         <div class="field"><label>Walk speed (m/s)</label><input type="range" id="set-speed" min="3" max="12" step="0.1"><span class="value" id="set-speed-v"></span></div>
         <div class="field"><label>Tracking targets</label><input type="number" id="set-tracking-count" min="1" max="8"></div>
+        <div class="field"><label>Submit to leaderboard</label><input type="checkbox" id="set-submit-scores"></div>
+        <p style="font-size:0.7rem;opacity:0.55;margin:4px 4px 0;">When off, runs are still saved to your local history — they just don't get posted to the shared leaderboard.</p>
       </div>
     </div>
     <div class="row" style="margin-top: 14px;">
@@ -2157,6 +2159,7 @@ const DEFAULT_SETTINGS = {
   weapon: 'hitscan',
   hudInset: 16,
   playerName: '',
+  submitScores: true,
   // Per-scenario custom multipliers (size, speed, dirChange) + enabled flag
   customScenarios: {
     bouncing: { size: 1, speed: 1, dir: 1, enabled: false },
@@ -3451,9 +3454,21 @@ document.addEventListener('keydown', (e) => {
   else if (e.code === 'KeyR' && mode) { e.preventDefault(); startGame(mode, weaponLocked ? Settings.weapon : null); }
   else if (e.code === 'Digit1' && !weaponLocked) { e.preventDefault(); setWeapon('hitscan'); }
   else if (e.code === 'Digit2' && !weaponLocked) { e.preventDefault(); setWeapon('tracking'); }
-  else if (e.code === 'Escape' && gameActive) {
-    if (gamePaused) { quitToMenu(); }
-    else { pauseGame(); }
+  else if (e.code === 'Escape') {
+    if (gameActive) {
+      if (gamePaused) { quitToMenu(); }
+      else { pauseGame(); }
+      return;
+    }
+    // Not in an active scenario — handle menu back-navigation
+    const active = document.querySelector('.screen.show');
+    if (!active) return;
+    const id = active.id;
+    if (id === 'scenario-detail') { showMainMenu(); }
+    else if (id === 'settings-panel') { closeSettings(); }
+    else if (id === 'history-screen') { showOnly(overlayScreen); }
+    else if (id === 'overlay') { showMainMenu(); }
+    // first-run and menu have no "back" — ignore
   }
 });
 document.addEventListener('keyup', (e) => { keys[e.code] = false; });
@@ -4695,8 +4710,9 @@ function gameOver(won) {
     lastHistoryKey = fullKey;
     refreshLeaderboard(bestKey, fullKey, lower);
     showLeaderboard();
-    // Submit to remote leaderboard (best effort) and re-render when it returns
-    if (LEADERBOARD_URL && bestVal > 0) {
+    // Submit to remote leaderboard (best effort) and re-render when it returns.
+    // Skipped if user opted out in settings.
+    if (LEADERBOARD_URL && Settings.submitScores && bestVal > 0) {
       submitRemoteScore(fullKey, {
         name: Settings.playerName || 'Anon',
         score: bestVal, acc, hits: shotsHit, headshots, mul: avgMul,
@@ -4925,6 +4941,7 @@ syncFns.push(bindSelect('set-weapon', () => Settings.weapon, v => Settings.weapo
 syncFns.push(bindSelect('set-difficulty', () => Settings.difficulty, v => Settings.difficulty = v));
 syncFns.push(bindRange ('set-speed', 'set-speed-v', () => Settings.walkSpeed, v => Settings.walkSpeed = v));
 syncFns.push(bindNumber('set-tracking-count', () => Settings.trackingCount, v => Settings.trackingCount = Math.max(1, Math.min(8, Math.round(v)))));
+syncFns.push(bindCheckbox('set-submit-scores', () => Settings.submitScores, v => Settings.submitScores = v));
 
 function syncSettingsUI() { for (const fn of syncFns) fn(); }
 
