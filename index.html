@@ -1036,6 +1036,58 @@
     text-align: center;
   }
   .hwaccel-warn b { color: var(--danger); font-size: 0.95rem; }
+  .hwaccel-warn summary {
+    cursor: pointer;
+    list-style: none;
+    transition: opacity var(--t-fast);
+  }
+  .hwaccel-warn summary::-webkit-details-marker { display: none; }
+  .hwaccel-warn summary:hover { opacity: 0.85; }
+  .hwaccel-body { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(239,68,68,0.3); text-align: left; }
+  .hwaccel-body p { margin-bottom: 10px; font-size: 0.82rem; }
+  .hwaccel-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .hwaccel-browser {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 140px;
+  }
+  .hwaccel-url {
+    flex: 1;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 5px 10px;
+    border-radius: var(--r-sm);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--text);
+    user-select: all;
+  }
+  .hwaccel-copy {
+    background: var(--danger);
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: background var(--t-fast);
+  }
+  .hwaccel-copy:hover { background: #dc2626; }
+  .hwaccel-copy.copied { background: var(--success); }
+  .hwaccel-note { margin-top: 4px; font-size: 0.75rem; opacity: 0.85; }
   .hwaccel-banner {
     background: rgba(239,68,68,0.18);
     border: 1px solid var(--danger);
@@ -1873,10 +1925,25 @@
 <!-- First-run setup — two steps: name, then sens -->
 <div id="first-run" class="screen">
   <h1>Welcome</h1>
-  <div class="hwaccel-warn">
-    <b>⚠ Hardware Acceleration Required</b><br>
-    This game runs on WebGL. If your browser has hardware/graphics acceleration turned off, the game will be a stuttery slideshow and basically unplayable. Make sure it is enabled in your browser settings before continuing.
-  </div>
+  <details class="hwaccel-warn">
+    <summary>
+      <b>⚠ Hardware Acceleration Required</b> — click for how to enable
+    </summary>
+    <div class="hwaccel-body">
+      <p>This game runs on WebGL. Without hardware/graphics acceleration it will be a stuttery slideshow. Open the URL for your browser in a new tab and turn it on:</p>
+      <div class="hwaccel-row">
+        <span class="hwaccel-browser">Chrome / Edge / Brave / Opera</span>
+        <code class="hwaccel-url" data-copy="chrome://settings/system">chrome://settings/system</code>
+        <button class="hwaccel-copy" data-target="chrome://settings/system">Copy</button>
+      </div>
+      <div class="hwaccel-row">
+        <span class="hwaccel-browser">Firefox</span>
+        <code class="hwaccel-url" data-copy="about:preferences#general">about:preferences#general</code>
+        <button class="hwaccel-copy" data-target="about:preferences#general">Copy</button>
+      </div>
+      <p class="hwaccel-note">Then toggle on <b>"Use graphics acceleration when available"</b> (Chrome-family) or <b>"Use hardware acceleration when available"</b> (Firefox, under Performance). Restart the browser.</p>
+    </div>
+  </details>
 
   <div class="fr-steps">
     <span class="fr-step active" data-step="1">1 · Name</span>
@@ -5346,6 +5413,27 @@ try {
 
 if (!localStorage.getItem('first_run_done')) {
   showFirstRun();
+}
+
+// Hardware-accel warning — wire copy buttons
+for (const btn of document.querySelectorAll('.hwaccel-copy')) {
+  btn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = btn.dataset.target;
+    try {
+      await navigator.clipboard.writeText(target);
+      const original = btn.textContent;
+      btn.classList.add('copied');
+      btn.textContent = 'Copied!';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.textContent = original;
+      }, 1400);
+    } catch (err) {
+      btn.textContent = 'Copy failed';
+    }
+  });
 }
 
 // Pre-fetch all remote leaderboards (best effort)
