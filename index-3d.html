@@ -216,22 +216,22 @@
     background: #e94560;
   }
 
-  /* Pursuer direction bar */
+  /* Pursuer direction bar (middle-left of screen) */
   #dir-bar {
     position: fixed;
-    top: 70px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 50%;
+    left: 24px;
+    transform: translateY(-50%);
     background: rgba(10,11,16,0.72);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    padding: 12px 22px;
+    padding: 12px 18px;
     border-radius: var(--r);
     border: 1px solid var(--border);
     z-index: 4;
     display: none;
     text-align: center;
-    min-width: 320px;
+    width: 240px;
     box-shadow: var(--shadow);
     transition: border-color var(--t-fast), background var(--t-fast);
   }
@@ -952,6 +952,14 @@
         <option value="tracking">Tracking</option>
       </select>
     </label>
+    <label>Pursuer Pattern:
+      <select id="menu-pattern-select">
+        <option value="short">Short</option>
+        <option value="medium">Medium</option>
+        <option value="long">Long</option>
+        <option value="varied">Varied</option>
+      </select>
+    </label>
   </div>
 
   <div class="section-label">Click Timing</div>
@@ -1071,6 +1079,14 @@
         </div>
         <div class="field"><label>Walk speed (m/s)</label><input type="range" id="set-speed" min="3" max="9" step="0.1"><span class="value" id="set-speed-v"></span></div>
         <div class="field"><label>Tracking targets</label><input type="number" id="set-tracking-count" min="1" max="8"></div>
+        <div class="field"><label>Pursuer pattern</label>
+          <select id="set-pursuer-pattern">
+            <option value="short">Short strafes</option>
+            <option value="medium">Medium strafes</option>
+            <option value="long">Long strafes</option>
+            <option value="varied">Varied</option>
+          </select>
+        </div>
       </div>
     </div>
     <div class="row" style="margin-top: 14px;">
@@ -1167,7 +1183,8 @@ const DEFAULT_SETTINGS = {
   difficulty: 'normal',
   walkSpeed: 5.5,
   trackingCount: 4,
-  weapon: 'hitscan'
+  weapon: 'hitscan',
+  pursuerPattern: 'varied'
 };
 
 const WEAPONS = {
@@ -1412,6 +1429,7 @@ let dodgeMul = 1;
 let pursuerDir = 'left';
 let pursuerFill = 0;       // 0..1
 let pursuerMul = 1;
+let pursuerCurrentDur = 2.5;
 
 // Camera rotation
 let yaw = 0;
@@ -1883,10 +1901,13 @@ const DIFFICULTY = {
 };
 function currentDifficulty() { return DIFFICULTY[Settings.difficulty] || DIFFICULTY.normal; }
 
-function pursuerFillDuration() {
-  if (Settings.difficulty === 'easy') return 4.0;
-  if (Settings.difficulty === 'hard') return 1.6;
-  return 2.5;
+function pickPursuerDuration() {
+  const p = Settings.pursuerPattern || 'varied';
+  if (p === 'short')  return 0.9 + Math.random() * 0.5;  // 0.9–1.4s
+  if (p === 'medium') return 2.1 + Math.random() * 0.8;  // 2.1–2.9s
+  if (p === 'long')   return 3.8 + Math.random() * 1.4;  // 3.8–5.2s
+  // varied: full range
+  return 0.8 + Math.random() * 4.4;                       // 0.8–5.2s
 }
 
 function playFlipBeep() {
@@ -2546,11 +2567,11 @@ function animate(now) {
 
   // Pursuer direction-bar update
   if (mode === 'cylinder' && gameActive && !gamePaused) {
-    const dur = pursuerFillDuration();
-    pursuerFill += dt / dur;
+    pursuerFill += dt / pursuerCurrentDur;
     if (pursuerFill >= 1) {
       pursuerFill = 0;
       pursuerDir = (pursuerDir === 'left') ? 'right' : 'left';
+      pursuerCurrentDur = pickPursuerDuration();
       playFlipBeep();
     }
     dirBarFill.style.width = (pursuerFill * 100) + '%';
@@ -2714,6 +2735,7 @@ function startGame(m) {
     pursuerDir = Math.random() < 0.5 ? 'left' : 'right';
     pursuerFill = 0;
     pursuerMul = 1;
+    pursuerCurrentDur = pickPursuerDuration();
     dirBar.classList.add('show');
     dirBar.classList.remove('correct', 'wrong');
     const e = makeCylinder();
@@ -3031,6 +3053,11 @@ syncFns.push(bindSelect('set-weapon', () => Settings.weapon, v => Settings.weapo
 syncFns.push(bindSelect('set-difficulty', () => Settings.difficulty, v => Settings.difficulty = v));
 syncFns.push(bindRange ('set-speed', 'set-speed-v', () => Settings.walkSpeed, v => Settings.walkSpeed = v));
 syncFns.push(bindNumber('set-tracking-count', () => Settings.trackingCount, v => Settings.trackingCount = Math.max(1, Math.min(8, Math.round(v)))));
+syncFns.push(bindSelect('set-pursuer-pattern', () => Settings.pursuerPattern, v => {
+  Settings.pursuerPattern = v;
+  const ms = $('menu-pattern-select');
+  if (ms) ms.value = v;
+}));
 
 function syncSettingsUI() { for (const fn of syncFns) fn(); }
 
@@ -3074,6 +3101,14 @@ $('difficulty-select').value = Settings.difficulty;
 
 $('menu-weapon-select').onchange = (e) => setWeapon(e.target.value);
 $('menu-weapon-select').value = Settings.weapon;
+
+$('menu-pattern-select').onchange = (e) => {
+  Settings.pursuerPattern = e.target.value;
+  saveSettings();
+  const sel = $('set-pursuer-pattern');
+  if (sel) sel.value = e.target.value;
+};
+$('menu-pattern-select').value = Settings.pursuerPattern;
 
 // Pause menu buttons
 $('pause-resume').onclick    = resumeGame;
