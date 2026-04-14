@@ -1634,7 +1634,6 @@
         <div class="scenario-desc">Stationary thin pole · pure strafe-timing drill</div>
       </div>
       <div class="scenario-buttons">
-        <button class="play-btn click" data-mode="pole" data-weapon="hitscan">Click</button>
         <button class="play-btn track" data-mode="pole" data-weapon="tracking">Track</button>
       </div>
     </div>
@@ -4741,6 +4740,10 @@ function openScenarioDetail(modeKey) {
   $('sd-title').textContent = info.title;
   $('sd-desc').textContent = info.description;
 
+  // Pole Practice is tracking-only — hide the Click play button + click bests cells
+  const isPoleOnly = (modeKey === 'pole');
+  $('sd-play-click').style.display = isPoleOnly ? 'none' : '';
+
   // Sync customize UI from saved per-scenario settings
   const cfg = Settings.customScenarios[modeKey] || { size: 1, speed: 1, dir: 1, enabled: false };
   $('sd-cust-size').value = cfg.size;
@@ -4752,10 +4755,11 @@ function openScenarioDetail(modeKey) {
   $('sd-cust-enable').checked = !!cfg.enabled;
   if (cfg.enabled) $('sd-customize').setAttribute('open', '');
 
-  // Populate the bests grid (3 difficulties × 2 weapons)
+  // Populate the bests grid (3 difficulties × 2 weapons; pole is tracking-only)
   const bestsEl = $('sd-bests');
   bestsEl.innerHTML = '';
-  for (const wpn of ['hitscan', 'tracking']) {
+  const weapons = isPoleOnly ? ['tracking'] : ['hitscan', 'tracking'];
+  for (const wpn of weapons) {
     for (const diff of ['easy', 'normal', 'hard']) {
       const key = modeKey + '-' + diff + '-' + wpn;
       const stored = localStorage.getItem('best2_' + key);
