@@ -1064,6 +1064,65 @@
     pointer-events: none;
   }
 
+  /* Scenario detail screen */
+  #scenario-detail .container {
+    max-width: 760px;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 28px 32px;
+    box-shadow: var(--shadow-lg);
+  }
+  #scenario-detail h1 { text-align: left; margin-bottom: 6px; }
+  .sd-description {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+    max-width: 620px;
+  }
+  .sd-bests-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1.8px;
+    color: var(--text-dim);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .sd-bests {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .sd-cell {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 12px 14px;
+    text-align: center;
+  }
+  .sd-cell .lbl {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    color: var(--text-dim);
+    font-weight: 700;
+  }
+  .sd-cell .val {
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .sd-cell.click { border-left: 3px solid #ef4444; }
+  .sd-cell.track { border-left: 3px solid var(--accent); }
+  .sd-cell.empty .val { color: var(--text-dim); font-weight: 500; }
+
+  /* Make the scenario-info area visibly clickable */
+  .scenario-card { cursor: pointer; }
+  .scenario-card .scenario-buttons { cursor: default; }
+
   /* Run history detail screen */
   #history-screen .container {
     max-width: 760px;
@@ -1302,7 +1361,7 @@
   </div>
 
   <div class="scenario-list">
-    <div class="scenario-card">
+    <div class="scenario-card" data-mode="bouncing">
       <div class="scenario-info">
         <div class="scenario-name">Bouncing Targets</div>
         <div class="scenario-desc">Sphere targets bouncing in a 3D box · collide with each other and walls</div>
@@ -1312,7 +1371,7 @@
         <button class="play-btn track" data-mode="bouncing" data-weapon="tracking">Track</button>
       </div>
     </div>
-    <div class="scenario-card">
+    <div class="scenario-card" data-mode="cylinder">
       <div class="scenario-info">
         <div class="scenario-name">Pursuer</div>
         <div class="scenario-desc">One cylinder bot orbits and kites you · HP bar</div>
@@ -1322,7 +1381,7 @@
         <button class="play-btn track" data-mode="cylinder" data-weapon="tracking">Track</button>
       </div>
     </div>
-    <div class="scenario-card">
+    <div class="scenario-card" data-mode="dodge">
       <div class="scenario-info">
         <div class="scenario-name">Dodge</div>
         <div class="scenario-desc">WASD around a room · strafe to the green zone for ×2</div>
@@ -1332,7 +1391,7 @@
         <button class="play-btn track" data-mode="dodge" data-weapon="tracking">Track</button>
       </div>
     </div>
-    <div class="scenario-card">
+    <div class="scenario-card" data-mode="pole">
       <div class="scenario-info">
         <div class="scenario-name">Pole Practice</div>
         <div class="scenario-desc">Stationary thin pole · pure strafe-timing drill</div>
@@ -1496,6 +1555,31 @@
   <p class="big" id="cal-live">0 movement units</p>
   <p>Suggested in / 360°: <b id="cal-suggest">—</b></p>
   <small>ESC to cancel</small>
+</div>
+
+<!-- Scenario detail screen -->
+<div id="scenario-detail" class="screen">
+  <div class="container">
+    <h1 id="sd-title">Scenario</h1>
+    <p id="sd-desc" class="sd-description"></p>
+
+    <div class="sd-bests-title">Best Scores</div>
+    <div class="sd-bests" id="sd-bests"></div>
+
+    <div class="chart-card" style="margin-top:14px;">
+      <div class="chart-label">
+        <span>Score · <span id="sd-chart-key"></span></span>
+        <span class="latest" id="sd-chart-latest"></span>
+      </div>
+      <canvas id="sd-chart" width="640" height="120"></canvas>
+    </div>
+
+    <div class="row" style="margin-top: 18px;">
+      <button class="btn primary" id="sd-play-click">▶ Play Click</button>
+      <button class="btn success" id="sd-play-track">▶ Play Track</button>
+      <button class="btn muted" id="sd-back">Back</button>
+    </div>
+  </div>
 </div>
 
 <!-- Run history drill-down -->
@@ -3974,13 +4058,92 @@ $('settings-reset').onclick = () => {
 };
 
 // ============================================================================
+// Scenario detail screen
+// ============================================================================
+const SCENARIO_INFO = {
+  bouncing: {
+    title: 'Bouncing Targets',
+    description: 'Five sphere targets bounce around a 3D box arena directly in front of you. They collide with each other and the walls, capped at a max speed so motion stays trackable. Difficulty scales target size and bounce energy. Hitscan = clean kills, tracking = sustained burn.'
+  },
+  cylinder: {
+    title: 'Pursuer',
+    description: 'A single cylinder bot orbits and kites you at fixed range, periodically flipping its strafe direction. WASD movement enabled — use the strafe bar bottom-left to time your switches for the ×2 multiplier. Reactivity (notice + flick ms) is measured per direction flip.'
+  },
+  dodge: {
+    title: 'Dodge',
+    description: 'Free-move around an enclosed room with WASD against six scattered targets. The strafe bar fills as you strafe; switch direction in the green zone to land the ×2 multiplier. Pure movement-aim training.'
+  },
+  pole: {
+    title: 'Pole Practice',
+    description: 'A stationary thin pole locked to the room center. No AI movement — just pure strafe-form rhythm drill. Use the bar to commit to long, medium, or short strafes (driven by difficulty) and rack up the multiplier. Best as a warmup.'
+  }
+};
+
+const sdScreen = $('scenario-detail');
+let sdMode = null;
+
+function openScenarioDetail(modeKey) {
+  const info = SCENARIO_INFO[modeKey];
+  if (!info) return;
+  sdMode = modeKey;
+  $('sd-title').textContent = info.title;
+  $('sd-desc').textContent = info.description;
+
+  // Populate the bests grid (3 difficulties × 2 weapons)
+  const bestsEl = $('sd-bests');
+  bestsEl.innerHTML = '';
+  for (const wpn of ['hitscan', 'tracking']) {
+    for (const diff of ['easy', 'normal', 'hard']) {
+      const key = modeKey + '-' + diff + '-' + wpn;
+      const stored = localStorage.getItem('best2_' + key);
+      const v = stored ? parseFloat(stored) : null;
+      const cell = document.createElement('div');
+      cell.className = 'sd-cell ' + (wpn === 'tracking' ? 'track' : 'click') + (v === null ? ' empty' : '');
+      const wpnLabel = wpn === 'tracking' ? 'Track' : 'Click';
+      const diffLabel = diff.charAt(0).toUpperCase() + diff.slice(1);
+      cell.innerHTML = `<div class="lbl">${diffLabel} · ${wpnLabel}</div><div class="val">${v !== null ? (Number.isInteger(v) ? v : v.toFixed(2)) : '—'}</div>`;
+      bestsEl.appendChild(cell);
+    }
+  }
+
+  // Chart of the current (difficulty, weapon) selection
+  const currentKey = modeKey + '-' + Settings.difficulty + '-' + Settings.weapon;
+  const history = getRunHistory(currentKey);
+  const canvas = $('sd-chart');
+  $('sd-chart-key').textContent = `${Settings.difficulty} · ${Settings.weapon === 'tracking' ? 'track' : 'click'}`;
+  if (history.length > 0) {
+    const scoreVals = history.map(r => r.score);
+    drawLineChart(canvas, scoreVals, '#06b6d4', { overlay: rollingAverage(scoreVals, 5) });
+    $('sd-chart-latest').textContent = scoreVals[scoreVals.length - 1];
+  } else {
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    $('sd-chart-latest').textContent = 'no runs yet';
+  }
+
+  showOnly(sdScreen);
+}
+
+$('sd-back').onclick = () => showOnly(menuScreen);
+$('sd-play-click').onclick = () => { if (sdMode) startGame(sdMode, 'hitscan'); };
+$('sd-play-track').onclick = () => { if (sdMode) startGame(sdMode, 'tracking'); };
+
+// ============================================================================
 // Wire menu — scenario cards + difficulty toggle
 // ============================================================================
 for (const btn of document.querySelectorAll('.play-btn')) {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation(); // don't bubble to the card click handler
     const m = btn.dataset.mode;
     const w = btn.dataset.weapon;
     startGame(m, w);
+  });
+}
+
+// Card click → open detail screen (excluding play buttons)
+for (const card of document.querySelectorAll('.scenario-card[data-mode]')) {
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.scenario-buttons')) return;
+    openScenarioDetail(card.dataset.mode);
   });
 }
 
