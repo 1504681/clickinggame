@@ -81,66 +81,102 @@
   #hud.hide { display: none; }
   #hud .label { opacity: 0.55; font-weight: 500; margin-right: 4px; }
 
-  /* Leaderboard panel — anchored top-right when the game over overlay is up */
+  /* Game-over row — card + leaderboard side by side */
+  .gameover-row {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+    max-width: 100%;
+  }
+
+  /* Leaderboard panel — attached to the right of the gameover card */
   #leaderboard {
-    position: fixed;
-    top: 50%;
-    right: 32px;
-    transform: translateY(-50%);
     width: 260px;
-    max-height: 70vh;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-lg);
-    z-index: 26;
     display: none;
+    flex-direction: column;
     overflow: hidden;
   }
-  #leaderboard.show { display: block; }
-  @media (max-width: 1100px) { #leaderboard { display: none !important; } }
+  #leaderboard.show { display: flex; }
+  @media (max-width: 1100px) {
+    #leaderboard { display: none !important; }
+    .gameover-row { flex-direction: column; }
+  }
   .lb-header {
-    padding: 10px 14px 8px;
+    padding: 18px 18px 14px;
     border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(6,182,212,0.08), transparent);
   }
   .lb-title {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     font-weight: 800;
     letter-spacing: -0.2px;
     color: var(--text);
   }
   .lb-sub {
-    font-size: 0.6rem;
+    font-size: 0.62rem;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 800;
+    margin-top: 4px;
+  }
+  .lb-rows {
+    padding: 6px 0;
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .lb-row {
+    display: grid;
+    grid-template-columns: 26px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background var(--t-fast);
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-row:hover { background: rgba(255,255,255,0.03); }
+  .lb-row.you {
+    background: rgba(6,182,212,0.14);
+    border-left: 3px solid var(--accent);
+    padding-left: 13px;
+  }
+  .lb-row.you:hover { background: rgba(6,182,212,0.18); }
+  .lb-row .lb-rank {
     color: var(--text-dim);
+    font-weight: 800;
+    font-size: 0.78rem;
+    text-align: center;
+  }
+  .lb-row .lb-rank.gold   { color: var(--gold); text-shadow: 0 0 8px rgba(251,191,36,0.4); }
+  .lb-row .lb-rank.silver { color: #e2e8f0; }
+  .lb-row .lb-rank.bronze { color: #fb923c; }
+  .lb-row .lb-score {
+    font-weight: 800;
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  .lb-row .lb-acc {
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .lb-empty {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 1.5px;
     font-weight: 700;
-    margin-top: 2px;
-  }
-  .lb-rows { padding: 4px 0; max-height: calc(100vh - 270px); overflow-y: auto; }
-  .lb-row {
-    display: grid;
-    grid-template-columns: 22px 1fr auto;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    font-size: 0.78rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .lb-row.you { background: rgba(6,182,212,0.10); }
-  .lb-row .lb-rank { color: var(--text-dim); font-weight: 700; font-size: 0.7rem; }
-  .lb-row .lb-rank.gold { color: var(--gold); }
-  .lb-row .lb-rank.silver { color: #cbd5e1; }
-  .lb-row .lb-rank.bronze { color: #d97706; }
-  .lb-row .lb-score { font-weight: 800; color: var(--text); }
-  .lb-row .lb-acc { color: var(--text-dim); font-size: 0.7rem; font-weight: 600; }
-  .lb-empty {
-    padding: 16px 14px;
-    text-align: center;
-    color: var(--text-dim);
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
   }
 
   /* Streak indicator */
@@ -1532,14 +1568,6 @@
   <div class="value" id="streak-val">0</div>
 </div>
 
-<div id="leaderboard">
-  <div class="lb-header">
-    <div class="lb-title" id="lb-title">Scenario</div>
-    <div class="lb-sub" id="lb-sub">—</div>
-  </div>
-  <div class="lb-rows" id="lb-rows"></div>
-</div>
-
 <div id="hit-marker">
   <svg viewBox="0 0 30 30">
     <line x1="6" y1="6" x2="13" y2="13"></line>
@@ -1918,6 +1946,7 @@
 
 <!-- Game over overlay -->
 <div id="overlay" class="screen">
+ <div class="gameover-row">
   <div class="gameover-card">
     <div class="scoreboard-label" id="scoreboard-label"></div>
     <h2 id="over-title">Game Over</h2>
@@ -1952,6 +1981,15 @@
     </div>
     <div class="key-hint">R to restart · ESC for menu</div>
   </div>
+
+  <aside id="leaderboard">
+    <div class="lb-header">
+      <div class="lb-title" id="lb-title">Scenario</div>
+      <div class="lb-sub" id="lb-sub">—</div>
+    </div>
+    <div class="lb-rows" id="lb-rows"></div>
+  </aside>
+ </div>
 </div>
 
 <script type="module">
