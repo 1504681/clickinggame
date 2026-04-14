@@ -4467,7 +4467,8 @@ for (const card of document.querySelectorAll('.scenario-card[data-mode]')) {
   });
 }
 
-const difficultyButtons = document.querySelectorAll('.diff-btn');
+// Only main-menu difficulty buttons (not the pause-menu ones, which use data-pause-diff)
+const difficultyButtons = document.querySelectorAll('[data-diff]');
 function syncDifficultyButtons() {
   for (const b of difficultyButtons) {
     b.classList.toggle('active', b.dataset.diff === Settings.difficulty);
