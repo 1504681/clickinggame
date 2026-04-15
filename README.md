@@ -12,6 +12,9 @@ A full-featured browser FPS aim trainer with real movement physics, a shared lea
 
 ---
 
+<img width="1246" height="946" alt="image" src="https://github.com/user-attachments/assets/ea852ed5-60e8-4078-ad49-13af94d43285" />
+
+
 ## Scenarios
 
 Each scenario can be played with **Click Timing** (hitscan · 1-shot kill · semi-auto) or **Tracking** (auto-fire · low damage per tick). Both weapons share scoring but feel different — click rewards precise timing, tracking rewards sustained on-target accuracy.
