@@ -5752,10 +5752,11 @@ for (const btn of document.querySelectorAll('.play-btn')) {
     e.stopPropagation(); // don't bubble to the card click handler
     const m = btn.dataset.mode;
     const w = btn.dataset.weapon;
-    // Inline play buttons always use the standard difficulty (not custom)
-    activeCustomMode = false;
-    activeCustomCfg = null;
-    startGame(m, w);
+    // Open the scenario detail screen with this weapon preselected so the
+    // user sees the leaderboard for that (mode, weapon) before committing.
+    Settings.weapon = w;
+    saveSettings();
+    openScenarioDetail(m);
   });
 }
 
