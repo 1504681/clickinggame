@@ -266,6 +266,41 @@
   #fps-counter.warn { color: var(--warning); }
   #fps-counter.bad { color: var(--danger); }
 
+  /* Scenario pill — shows name · weapon · difficulty while in-game */
+  #scenario-pill {
+    position: fixed; top: var(--hud-inset); left: calc(var(--hud-inset) + 96px);
+    display: none;
+    align-items: center; gap: 10px;
+    background: rgba(10,11,16,0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 8px 14px;
+    border-radius: var(--r);
+    border: 1px solid var(--border);
+    font-size: 0.82rem;
+    font-weight: 700;
+    z-index: 6;
+    box-shadow: var(--shadow);
+    pointer-events: none;
+  }
+  #scenario-pill.show { display: flex; }
+  #scenario-pill .sp-name { color: var(--text); }
+  #scenario-pill .sp-badge {
+    font-size: 0.64rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  #scenario-pill .sp-weapon.click { background: rgba(6,182,212,0.18); color: #67e8f9; border: 1px solid rgba(6,182,212,0.5); }
+  #scenario-pill .sp-weapon.track { background: rgba(167,139,250,0.18); color: #c4b5fd; border: 1px solid rgba(167,139,250,0.5); }
+  #scenario-pill .sp-diff.diff-easy   { background: #10b981; color: #001b14; }
+  #scenario-pill .sp-diff.diff-normal { background: #06b6d4; color: #001318; }
+  #scenario-pill .sp-diff.diff-hard   { background: #ef4444; color: #1a0606; }
+  #scenario-pill .sp-diff.diff-custom { background: #fbbf24; color: #1a1206; }
+
   /* Fullscreen button */
   #btn-fullscreen {
     position: fixed; top: var(--hud-inset); right: var(--hud-inset);
@@ -1965,6 +2000,11 @@
 </div>
 
 <div id="fps-counter">— FPS</div>
+<div id="scenario-pill">
+  <span class="sp-name" id="sp-name">—</span>
+  <span class="sp-badge sp-weapon" id="sp-weapon">—</span>
+  <span class="sp-badge sp-diff" id="sp-diff">—</span>
+</div>
 <div id="app-version"></div>
 <div id="augment-banner">
   <div class="aug-title">AUGMENTED: <span id="aug-name">—</span></div>
@@ -2942,6 +2982,26 @@ const calOverlay = $('cal-overlay');
 const hud = $('hud');
 const crosshair = $('crosshair');
 const fpsCounter = $('fps-counter');
+const scenarioPill = $('scenario-pill');
+const SCENARIO_SHORT_NAMES = {
+  bouncing: 'Bouncing',
+  cylinder: 'Pursuer',
+  dodge: 'Dodge',
+  pole: 'Pole',
+};
+function setScenarioPill(m, weapon) {
+  const name = SCENARIO_SHORT_NAMES[m] || m;
+  $('sp-name').textContent = name;
+  const w = $('sp-weapon');
+  w.textContent = weapon === 'tracking' ? 'Track' : 'Click';
+  w.className = 'sp-badge sp-weapon ' + (weapon === 'tracking' ? 'track' : 'click');
+  const d = $('sp-diff');
+  const diffKey = activeCustomMode ? 'custom' : Settings.difficulty;
+  d.textContent = diffKey;
+  d.className = 'sp-badge sp-diff diff-' + diffKey;
+  scenarioPill.classList.add('show');
+}
+function hideScenarioPill() { scenarioPill.classList.remove('show'); }
 const fsButton = $('btn-fullscreen');
 const hsToast = $('hs-toast');
 const dodgeBar = $('dodge-bar');
@@ -4697,6 +4757,7 @@ function showMainMenu() {
   dodgeBar.classList.remove('show');
   dirBar.classList.remove('show');
   weaponHud.classList.remove('show');
+  hideScenarioPill();
   hideLeaderboard();
   // Make sure camera fov reflects the current augment/base setting
   const augActive = Settings.augment && AUGMENTS[Settings.augment];
@@ -4753,6 +4814,7 @@ function startGame(m, lockedWeapon = null) {
   hud.classList.remove('hide');
   crosshair.classList.add('show');
   streakEl.classList.add('show');
+  setScenarioPill(m, Settings.weapon);
   scoreVal.textContent = '0';
   updateAccuracy();
   updateStreak();
@@ -5069,6 +5131,7 @@ function gameOver(won) {
   dodgeBar.classList.remove('show');
   dirBar.classList.remove('show');
   weaponHud.classList.remove('show');
+  hideScenarioPill();
 
   const elapsed = elapsedSeconds().toFixed(2);
   const acc = shotsFired === 0 ? 0 : Math.round((shotsHit / shotsFired) * 100);
