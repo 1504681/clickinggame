@@ -1964,6 +1964,64 @@
     font-weight: 600;
   }
 
+  /* Mascot tip card (game-over) */
+  #mascot-tip {
+    display: none;
+    margin: 16px 0 4px;
+    padding: 12px 14px 12px 12px;
+    background: linear-gradient(135deg, rgba(6,182,212,0.08), rgba(251,191,36,0.05));
+    border: 1px solid rgba(6,182,212,0.25);
+    border-radius: var(--r-md, 10px);
+    text-align: left;
+    position: relative;
+    animation: mascotPop 0.45s cubic-bezier(.2,1.4,.4,1);
+  }
+  #mascot-tip.show { display: flex; gap: 12px; align-items: flex-start; }
+  @keyframes mascotPop {
+    0%   { transform: translateY(8px) scale(0.96); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  #mascot-tip .mascot-avatar {
+    flex: 0 0 auto;
+    width: 48px; height: 48px;
+    display: grid; place-items: center;
+    background: radial-gradient(circle at 35% 30%, rgba(6,182,212,0.25), rgba(6,182,212,0.05) 70%);
+    border-radius: 50%;
+    animation: mascotBob 2.4s ease-in-out infinite;
+  }
+  @keyframes mascotBob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-3px); }
+  }
+  #mascot-tip .mascot-body { flex: 1 1 auto; min-width: 0; }
+  #mascot-tip .mascot-name {
+    font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 1.5px; font-weight: 800;
+    color: var(--accent); margin-bottom: 4px;
+  }
+  #mascot-tip .mascot-name .mascot-sub {
+    margin-left: 8px; color: var(--text-dim);
+    font-weight: 600; letter-spacing: 1px;
+  }
+  #mascot-tip .mascot-msg {
+    font-size: 0.9rem; line-height: 1.4; color: var(--text);
+    font-weight: 500;
+  }
+  #mascot-tip .mascot-close {
+    position: absolute; top: 6px; right: 8px;
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-dim); font-size: 1rem; line-height: 1;
+    padding: 4px 6px; border-radius: 6px;
+  }
+  #mascot-tip .mascot-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  #mascot-tip .mascot-never {
+    margin-top: 8px; background: transparent; border: none; cursor: pointer;
+    color: var(--text-dim); font-size: 0.7rem;
+    text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700;
+    padding: 0; text-decoration: underline; text-underline-offset: 2px;
+  }
+  #mascot-tip .mascot-never:hover { color: var(--danger); }
+
   /* Hit marker on crosshair (brief X pulse) */
   #hit-marker {
     position: fixed; top: 50%; left: 50%;
@@ -2561,6 +2619,27 @@
     </div>
     <p id="over-time"></p>
     <p id="best-score"></p>
+    <div id="mascot-tip" role="status" aria-live="polite">
+      <div class="mascot-avatar" aria-hidden="true">
+        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="20" cy="24" rx="12" ry="11" fill="#06b6d4"/>
+          <ellipse cx="20" cy="24" rx="7" ry="6" fill="#a5f3fc"/>
+          <circle cx="22" cy="14" r="7.5" fill="#06b6d4"/>
+          <circle cx="24.5" cy="12.5" r="1.6" fill="#0b1020"/>
+          <circle cx="25.1" cy="12" r="0.55" fill="#fff"/>
+          <polygon points="29,15 33,14.5 29,17" fill="#fbbf24"/>
+          <path d="M10 22 Q6 26 10 30 Q12 26 12 24 Z" fill="#0891b2"/>
+          <circle cx="17" cy="32" r="1.4" fill="#fbbf24"/>
+          <circle cx="23" cy="32" r="1.4" fill="#fbbf24"/>
+        </svg>
+      </div>
+      <div class="mascot-body">
+        <div class="mascot-name">Pipr <span class="mascot-sub" id="mascot-sub"></span></div>
+        <div class="mascot-msg" id="mascot-msg"></div>
+        <button class="mascot-never" id="mascot-never" type="button">Never show tips again</button>
+      </div>
+      <button class="mascot-close" id="mascot-close" type="button" aria-label="Dismiss">✕</button>
+    </div>
     <div class="row" style="margin-top: 18px;">
       <button class="btn primary" id="btn-retry">Play Again</button>
       <button class="btn muted" id="btn-menu">Menu</button>
@@ -2615,6 +2694,7 @@ const DEFAULT_SETTINGS = {
   augment: null,  // 'smoothness' | 'speed' | null
   strafeTutorialSeen: false,
   showVersion: true,
+  mascotTipsDisabled: false,
   // Per-scenario custom multipliers (size, speed, dirChange, hp) + enabled flag
   customScenarios: {
     bouncing: { size: 1, speed: 1, dir: 1, hp: 1, distance: 1, enabled: false },
@@ -3547,7 +3627,8 @@ function makeCylinder() {
   group.add(head);
 
   const hpMul = currentDifficulty().hpMul || 1;
-  const hp = CYLINDER_HP * hpMul;
+  const weaponMul = Settings.weapon === 'hitscan' ? 2 : 1;
+  const hp = CYLINDER_HP * hpMul * weaponMul;
   const e = {
     group, body, head, bodyMat, headMat,
     vx: 0, vz: 0,
@@ -5388,8 +5469,82 @@ function gameOver(won) {
     $('chart-acc-latest').textContent = '';
   }
 
+  maybeShowMascotTip({ mode, acc, isClickWeapon, isPb, bestStreak, history, shotsFired, avgMul, reactiveAvg: pursuerReactiveSamples.length ? pursuerReactiveSamples.reduce((a,b)=>a+b,0) / pursuerReactiveSamples.length : null });
+
   showOnly(overlayScreen);
 }
+
+// ============================================================================
+// Pipr the mascot — performance-science aim tips after a run
+// ============================================================================
+const MASCOT_GENERIC_TIPS = [
+  { sub: 'warmup', msg: 'If this is your first run of the session, a couple of easy reps first can really help — no rush into the hard stuff.' },
+  { sub: 'posture', msg: 'Quick check: are your shoulders tense? Drop them on the next run. A loose grip flicks way better than a tight one.' },
+  { sub: 'consistency', msg: "Try to keep your DPI and sens locked in across scenarios — muscle memory settles in on those exact numbers." },
+  { sub: 'breathing', msg: 'Try exhaling softly into your clicks on the next run. Holding your breath sneaks in extra tension without you noticing.' },
+  { sub: 'grip', msg: 'Wrist for the little stuff, arm for the big flicks — if a motion felt awkward, it might just be the wrong muscle group.' },
+  { sub: 'eyes on target', msg: 'Try locking your eyes to the target first, then letting your crosshair follow. Eye-lead beats crosshair-lead almost every time.' },
+  { sub: 'have fun', msg: 'Aim improves fastest when practice feels like play — hit another run and enjoy it.' },
+];
+function pickMascotTip({ mode, acc, isClickWeapon, isPb, bestStreak, history, shotsFired, avgMul, reactiveAvg }) {
+  const forced = [];
+  if (isClickWeapon && shotsFired >= 10) {
+    if (acc < 65) forced.push({ sub: 'accuracy', msg: 'No worries — try easing off the pace a little. Most people find their best speed settles in around 85–95% accuracy.', force: true });
+    else if (acc < 80) forced.push({ sub: 'accuracy', msg: "So close to the ideal band! A tiny bit more patience on each shot and you'll be right in the 85–95% sweet spot." });
+    else if (acc > 97) forced.push({ sub: 'try faster', msg: "Super clean run. When accuracy is this high, it often means there's room to push the pace a little — give it a try next run." });
+    else if (acc >= 85 && acc <= 95) forced.push({ sub: 'nicely balanced', msg: "You're right in the sweet spot. If you feel good, try nudging the pace up a hair next run and see what holds." });
+  }
+  if (!isClickWeapon && shotsFired >= 30) {
+    if (acc < 35) forced.push({ sub: 'tracking', msg: "Tracking's tricky — try aiming a touch ahead of the target and making tiny corrections instead of chasing it. Way less work." });
+    else if (acc >= 70) forced.push({ sub: 'smooth', msg: "Really smooth tracking! If you want more of a challenge, the next difficulty up is worth a try." });
+  }
+  if (mode === 'cylinder' && reactiveAvg !== null && reactiveAvg > 280) {
+    forced.push({ sub: 'reaction', msg: `Quick tip — watching the cylinder's body (not the head) usually gives you an earlier read on direction changes. Worth a try next run.` });
+  }
+  if (mode === 'pole' && shotsFired >= 30) {
+    forced.push({ sub: 'pole', msg: 'For pole practice, try planting your wrist and steering with the arm. Lots of tiny corrections beats one big chase.' });
+  }
+  if (bestStreak <= 2 && shotsFired >= 15 && !isPb) {
+    forced.push({ sub: 'steady', msg: "If a miss throws off the next few shots, that's super normal. Next run, take a breath and reset your aim fully between targets." });
+  }
+  if (isPb) {
+    forced.push({ sub: 'nice run!', msg: "Great run! On the next one, try to match the same tempo and grip — you're clearly dialed in right now." });
+  }
+  if (history && history.length >= 4 && isClickWeapon) {
+    const last4 = history.slice(-4).map(r => r.acc);
+    if (last4.every((v, i) => i === 0 || v <= last4[i - 1]) && last4[0] - last4[last4.length - 1] >= 10) {
+      forced.push({ sub: 'reset', msg: "Accuracy has drifted down a bit over the last few runs. Try a slower, cleaner run next — sometimes dialing pace back 10% resets the groove." });
+    }
+  }
+
+  if (forced.length) return forced[Math.floor(Math.random() * forced.length)];
+  return MASCOT_GENERIC_TIPS[Math.floor(Math.random() * MASCOT_GENERIC_TIPS.length)];
+}
+const MASCOT_COOLDOWN_MS = 6 * 60 * 1000; // min gap between appearances
+const MASCOT_LAST_KEY = 'mascotLastShown';
+function maybeShowMascotTip(ctx) {
+  const tipEl = $('mascot-tip');
+  tipEl.classList.remove('show');
+  if (Settings.mascotTipsDisabled) return;
+  // Respect cooldown — Pipr should feel like an occasional visitor, not a pop-up
+  const lastShown = parseInt(localStorage.getItem(MASCOT_LAST_KEY) || '0', 10);
+  if (Date.now() - lastShown < MASCOT_COOLDOWN_MS) return;
+  // Roughly 1 in 4 runs past cooldown — keeps it feeling unexpected
+  if (Math.random() > 0.25) return;
+  const tip = pickMascotTip(ctx);
+  if (!tip) return;
+  $('mascot-sub').textContent = tip.sub || '';
+  $('mascot-msg').textContent = tip.msg;
+  tipEl.style.animation = 'none'; void tipEl.offsetWidth; tipEl.style.animation = '';
+  tipEl.classList.add('show');
+  localStorage.setItem(MASCOT_LAST_KEY, Date.now());
+}
+$('mascot-close').onclick = () => $('mascot-tip').classList.remove('show');
+$('mascot-never').onclick = () => {
+  Settings.mascotTipsDisabled = true;
+  saveSettings();
+  $('mascot-tip').classList.remove('show');
+};
 
 // ============================================================================
 // Calibration
